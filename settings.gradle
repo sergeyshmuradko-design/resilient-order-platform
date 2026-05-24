@@ -1,0 +1,4 @@
+rootProject.name = 'resilient-order-platform'
+
+include 'services:order-service'
+include 'services:payment-service'
