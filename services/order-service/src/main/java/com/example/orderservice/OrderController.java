@@ -9,10 +9,10 @@ import java.util.UUID;
 @RequestMapping("/orders")
 public class OrderController {
 
-    private final PaymentClient paymentClient;
+    private final ResilientPaymentService paymentService;
 
-    public OrderController(PaymentClient paymentClient) {
-        this.paymentClient = paymentClient;
+    public OrderController(ResilientPaymentService paymentService) {
+        this.paymentService = paymentService;
     }
 
     @PostMapping
@@ -20,8 +20,11 @@ public class OrderController {
         String orderId = UUID.randomUUID().toString();
         double amount = request.quantity() * 100.0;
 
+        String paymentStatus;
+
         PaymentResponse paymentResponse =
-            paymentClient.authorizePayment(orderId, amount);
+            paymentService.authorizePayment(orderId, amount);
+        paymentStatus = paymentResponse.status();
 
         return new OrderResponse(
             orderId,
@@ -30,7 +33,7 @@ public class OrderController {
             request.quantity(),
             amount,
             "CREATED",
-            paymentResponse.status(),
+            paymentStatus,
             Instant.now()
         );
     }

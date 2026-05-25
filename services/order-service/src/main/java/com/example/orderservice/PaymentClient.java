@@ -1,25 +1,17 @@
 package com.example.orderservice;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @Component
-public class PaymentClient {
+@FeignClient(
+    name = "payment-service",
+    url = "${services.payment.base-url}"
+)
+public interface PaymentClient {
 
-    private final RestClient restClient;
-
-    public PaymentClient(@Value("${services.payment.base-url}") String paymentBaseUrl) {
-        this.restClient = RestClient.builder()
-            .baseUrl(paymentBaseUrl)
-            .build();
-    }
-
-    public PaymentResponse authorizePayment(String orderId, double amount) {
-        return restClient.post()
-            .uri("/payments/authorize")
-            .body(new PaymentRequest(orderId, amount))
-            .retrieve()
-            .body(PaymentResponse.class);
-    }
+    @PostMapping("/payments/authorize")
+    public PaymentResponse authorizePayment(@RequestBody PaymentRequest request);
 }

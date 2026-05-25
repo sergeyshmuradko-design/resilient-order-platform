@@ -1,5 +1,8 @@
-.gradle
-build
-out
-.idea
+.gradle/
+build/
+target/
+out/
+.idea/
 *.impl
+.vscode/
+bin/
