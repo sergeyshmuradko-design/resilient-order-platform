@@ -1,6 +1,10 @@
 server:
   port: 8081
 
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+
 resilience4j:
   retry:
     instances:
@@ -29,6 +33,27 @@ spring:
           payment-service:
             connectTimeout: 1000
             readTimeout: 2000
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orders_db
+    username: orders_user
+    password: orders_pass
+    driver-class-name: org.postgresql.Driver
+
+    hikari:
+      pool-name: OrderServiceHikariPool
+      maximum-pool-size: 2 # Максимум 2 соединения к БД одновременно.
+      minimum-idle: 1 # Hikari старается держать хотя бы 1 свободное соединение готовым.
+      connection-timeout: 3000 # Если все 5 соединений заняты, новый request ждёт максимум 3 секунды. Потом ошибка.
+      idle-timeout: 600000 # Свободное соединение может простаивать 10 минут, потом Hikari может его закрыть.
+      max-lifetime: 1800000 # Соединение живёт максимум 30 минут, потом пересоздаётся. Это защищает от старых/stale connections.
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
 
 services:
   payment:

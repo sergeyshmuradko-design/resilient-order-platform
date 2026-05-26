@@ -2,6 +2,10 @@ package com.example.orderservice;
 
 import org.springframework.web.bind.annotation.*;
 
+import com.example.orderservice.entity.OrderEntity;
+import com.example.orderservice.repository.OrderRepository;
+import com.example.orderservice.service.OrderPersistenceService;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,9 +14,17 @@ import java.util.UUID;
 public class OrderController {
 
     private final ResilientPaymentService paymentService;
+    private final OrderRepository orderRepository;
+    private final OrderPersistenceService orderPersistenceService;
 
-    public OrderController(ResilientPaymentService paymentService) {
+    public OrderController(
+        ResilientPaymentService paymentService,
+        OrderRepository orderRepository,
+        OrderPersistenceService orderPersistenceService
+    ) {
         this.paymentService = paymentService;
+        this.orderRepository = orderRepository;
+        this.orderPersistenceService = orderPersistenceService;
     }
 
     @PostMapping
@@ -26,6 +38,21 @@ public class OrderController {
             paymentService.authorizePayment(orderId, amount);
         paymentStatus = paymentResponse.status();
 
+        Instant createdAt = Instant.now();
+
+        OrderEntity orderEntity = new OrderEntity(
+            orderId,
+            request.customerId(),
+            request.productId(),
+            request.quantity(),
+            amount,
+            "CREATED",
+            paymentStatus,
+            createdAt);
+
+        //orderRepository.save(orderEntity);
+        orderPersistenceService.saveOrderWithArtificialDelay(orderEntity);
+
         return new OrderResponse(
             orderId,
             request.customerId(),
@@ -34,7 +61,7 @@ public class OrderController {
             amount,
             "CREATED",
             paymentStatus,
-            Instant.now()
+            createdAt
         );
     }
 }
