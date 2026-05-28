@@ -14,9 +14,9 @@ resilience4j:
   circuitbreaker:
     instances:
       paymentServiceCircuitBreaker:
-        sliding-window-size: 5
-        minimum-number-of-calls: 3
-        failure-rate-threshold: 50
+        sliding-window-size: 5 # Circuit Breaker смотрит последние 5 вызовов.
+        minimum-number-of-calls: 3 # Если после минимум 3 вызовов
+        failure-rate-threshold: 50 # процент ошибок >= 50%, он переходит в OPEN.
         wait-duration-in-open-state: 10s
 
 app:
@@ -43,11 +43,12 @@ spring:
       pool-name: OrderServiceHikariPool
       maximum-pool-size: 2 # Максимум 2 соединения к БД одновременно.
       minimum-idle: 1 # Hikari старается держать хотя бы 1 свободное соединение готовым.
-      connection-timeout: 3000 # Если все 5 соединений заняты, новый request ждёт максимум 3 секунды. Потом ошибка.
+      connection-timeout: 3000 # Если все 2 соединения заняты, новый request ждёт максимум 3 секунды. Потом ошибка.
       idle-timeout: 600000 # Свободное соединение может простаивать 10 минут, потом Hikari может его закрыть.
       max-lifetime: 1800000 # Соединение живёт максимум 30 минут, потом пересоздаётся. Это защищает от старых/stale connections.
 
   jpa:
+    open-in-view: false # Когда включено соединение держится принудительно на все время http запроса
     hibernate:
       ddl-auto: update
     show-sql: true
