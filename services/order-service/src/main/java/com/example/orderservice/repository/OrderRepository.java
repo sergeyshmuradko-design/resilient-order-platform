@@ -10,7 +10,6 @@ import com.example.orderservice.entity.OrderEntity;
 import java.util.List;
 import java.util.stream.Stream;
 
-
 public interface OrderRepository extends JpaRepository<OrderEntity, String> {
 
     List<OrderEntity> findByOrderStatus(String orderStatus);
@@ -19,4 +18,6 @@ public interface OrderRepository extends JpaRepository<OrderEntity, String> {
     Stream<OrderEntity> streamByOrderStatus(@Param("status") String status);
 
     Page<OrderEntity> findByCustomerIdAndOrderStatus(String customerId, String orderStatus, Pageable pageable);
+
+    Page<OrderEntity> findByOrderStatus(String orderStatus, Pageable pageable);
 }

@@ -6,6 +6,11 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
 
 resilience4j:
+  bulkhead:
+    instances:
+      exportJobBulkhead:
+        max-concurrent-calls: 2 # одновременно максимум 2 export jobs
+        max-wait-duration: 0 # третий job не ждёт, а сразу получает ошибку
   retry:
     instances:
       paymentServiceRetry:
@@ -24,6 +29,11 @@ app:
     type: feign
 
 spring:
+  security:
+    user:
+      name: admin
+      password: admin123
+      roles: ADMIN
   application:
     name: order-service
   cloud:

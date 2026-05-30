@@ -1,7 +1,10 @@
-package com.example.orderservice;
+package com.example.orderservice.service;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+
+import com.example.orderservice.dto.PaymentRequest;
+import com.example.orderservice.dto.PaymentResponse;
 
 @Component
 @ConditionalOnProperty(

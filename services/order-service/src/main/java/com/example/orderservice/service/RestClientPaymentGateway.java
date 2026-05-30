@@ -1,4 +1,4 @@
-package com.example.orderservice;
+package com.example.orderservice.service;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -8,6 +8,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import com.example.orderservice.dto.PaymentRequest;
+import com.example.orderservice.dto.PaymentResponse;
 
 @Component
 @ConditionalOnProperty(

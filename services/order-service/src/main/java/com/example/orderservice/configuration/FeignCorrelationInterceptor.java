@@ -1,7 +1,9 @@
-package com.example.orderservice;
+package com.example.orderservice.configuration;
 
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
+
+import com.example.orderservice.service.CorrelationConstants;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;

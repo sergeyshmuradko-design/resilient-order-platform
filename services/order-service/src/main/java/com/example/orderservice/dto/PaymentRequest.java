@@ -1,4 +1,4 @@
-package com.example.orderservice;
+package com.example.orderservice.dto;
 
 public record PaymentRequest (
     String orderId,

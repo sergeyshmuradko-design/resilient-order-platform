@@ -1,4 +1,4 @@
-package com.example.orderservice;
+package com.example.orderservice.service;
 
 import java.time.Duration;
 
@@ -7,6 +7,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import com.example.orderservice.dto.PaymentRequest;
+import com.example.orderservice.dto.PaymentResponse;
 
 import reactor.netty.http.client.HttpClient;
 

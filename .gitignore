@@ -6,3 +6,4 @@ out/
 *.impl
 .vscode/
 bin/
+**/exports/
