@@ -27,8 +27,8 @@ public class AsyncExportService {
         this.exportTaskExecutor = exportTaskExecutor;
     }
 
-    public ExportJobEntity startExport(String status) {
-        ExportJobEntity job = exportJobService.createJob(status);
+    public ExportJobEntity startExport(String orderStatus) {
+        ExportJobEntity job = exportJobService.createJob(orderStatus);
         exportTaskExecutor.execute(() -> runExport(job.getJobId()));
         return job;
     }

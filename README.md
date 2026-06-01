@@ -82,3 +82,15 @@ curl -i -u "user:9e548291-52d8-4efc-9396-ed7f3520beac" "http://localhost:8081/or
 curl -i -u "admin:admin123" "http://localhost:8081/orders?customerId=CUST-1&status=CREATED"
 curl -i "http://localhost:8081/orders?customerId=CUST-1&status=CREATED"
 curl http://localhost:8081/actuator/health
+
+---
+
+TOKEN=$(curl -s -X POST http://localhost:8081/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  | jq -r '.accessToken')
+
+echo $TOKEN
+
+curl -i -H "Authorization: Bearer $TOKEN" \
+  -X POST "http://localhost:8081/exports?orderStatus=CREATED"

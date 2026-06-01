@@ -28,12 +28,11 @@ app:
   payment-client:
     type: feign
 
+security:
+  jwt:
+    secret: "dev-secret-key-dev-secret-key-123456"
+
 spring:
-  security:
-    user:
-      name: admin
-      password: admin123
-      roles: ADMIN
   application:
     name: order-service
   cloud:

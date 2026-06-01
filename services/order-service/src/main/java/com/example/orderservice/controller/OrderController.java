@@ -100,7 +100,7 @@ public class OrderController {
             paymentStatus,
             createdAt);
 
-        orderRepository.save(orderEntity);
+        orderPersistenceService.saveOrder(orderEntity);
         //orderPersistenceService.saveOrderWithArtificialDelay(orderEntity);
         //orderPersistenceService.saveOrderWithDelay(orderEntity);
 

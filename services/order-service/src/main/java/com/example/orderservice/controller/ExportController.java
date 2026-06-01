@@ -14,6 +14,7 @@ import com.example.orderservice.service.AsyncExportService;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
@@ -28,18 +29,21 @@ public class ExportController {
         this.asyncExportService = asyncExportService;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<ExportJobResponse> startExport(@RequestParam String status) {
-        ExportJobEntity job = asyncExportService.startExport(status);
+    public ResponseEntity<ExportJobResponse> startExport(@RequestParam String orderStatus) {
+        ExportJobEntity job = asyncExportService.startExport(orderStatus);
         return ResponseEntity.accepted().body(ExportJobResponse.from(job));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     @GetMapping("/{jobId}")
     public ResponseEntity<ExportJobResponse> getJob(@PathVariable String jobId) {
         ExportJobEntity job = asyncExportService.getJob(jobId);
         return ResponseEntity.ok().body(ExportJobResponse.from(job));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     @GetMapping("/{jobId}/download")
     public ResponseEntity<Resource> download(@PathVariable String jobId) {
         ExportJobEntity job = asyncExportService.getJob(jobId);
