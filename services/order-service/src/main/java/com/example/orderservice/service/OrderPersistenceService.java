@@ -2,6 +2,7 @@ package com.example.orderservice.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import com.example.orderservice.entity.OrderEntity;
@@ -21,6 +22,7 @@ public class OrderPersistenceService {
         this.orderRepository = orderRepository;
     }
 
+    @CacheEvict(value = "ordersByCustomerStatus", allEntries = true)
     @Transactional
     public void saveOrder(OrderEntity orderEntity) {
         log.info("Saving order. orderId={}", orderEntity.getOrderId());

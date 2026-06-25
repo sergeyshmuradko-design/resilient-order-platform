@@ -34,7 +34,22 @@ for i in {1..5}; do
 done
 wait
 
--------------
+---
+
+## run services
+
+./gradlew :services:order-service:bootRun
+
+## redis managing
+
+docker exec -it resilient-orders-redis redis-cli [KEYS *] [FLUSHALL] [exit]
+
+curl -H "Authorization: Bearer $TOKEN"  "http://localhost:8081/orders?customerId=CUST-1&status=CREATED&page=0&size=10"
+curl -H "Authorization: Bearer $TOKEN" -s -X POST http://localhost:8081/orders \
+    -H "Content-Type: application/json" \
+    -d "{\"customerId\":\"CUST-test\",\"productId\":\"PROD-test\",\"quantity\":2}"
+
+---
 
 for i in {1..100}; do
   curl -s -X POST http://localhost:8081/orders \
@@ -94,3 +109,13 @@ echo $TOKEN
 
 curl -i -H "Authorization: Bearer $TOKEN" \
   -X POST "http://localhost:8081/exports?orderStatus=CREATED"
+
+---
+
+## check rate limiter
+
+for i in {1..7}; do
+  curl -i -X POST http://localhost:8081/auth/token \
+    -H "Content-Type: application/json" \
+    -d '{"username":"admin","password":"wrong"}'
+done

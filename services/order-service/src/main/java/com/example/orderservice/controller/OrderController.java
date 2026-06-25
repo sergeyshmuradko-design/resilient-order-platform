@@ -8,11 +8,15 @@ import org.springframework.web.bind.annotation.*;
 
 import com.example.orderservice.dto.CreateOrderRequest;
 import com.example.orderservice.dto.OrderResponse;
+import com.example.orderservice.dto.OrderSearchResponse;
+import com.example.orderservice.dto.OrderSummaryResponse;
+import com.example.orderservice.dto.PageResponse;
 import com.example.orderservice.dto.PaymentResponse;
 import com.example.orderservice.entity.OrderEntity;
 import com.example.orderservice.repository.OrderRepository;
 import com.example.orderservice.service.OrderExportService;
 import com.example.orderservice.service.OrderPersistenceService;
+import com.example.orderservice.service.OrderQueryService;
 import com.example.orderservice.service.ResilientPaymentService;
 
 import java.io.PrintWriter;
@@ -34,17 +38,20 @@ public class OrderController {
     private final OrderRepository orderRepository;
     private final OrderPersistenceService orderPersistenceService;
     private final OrderExportService orderExportService;
+    private final OrderQueryService orderQueryService;
 
     public OrderController(
         ResilientPaymentService paymentService,
         OrderRepository orderRepository,
         OrderPersistenceService orderPersistenceService,
-        OrderExportService orderExportService
+        OrderExportService orderExportService,
+        OrderQueryService orderQueryService
     ) {
         this.paymentService = paymentService;
         this.orderRepository = orderRepository;
         this.orderPersistenceService = orderPersistenceService;
         this.orderExportService = orderExportService;
+        this.orderQueryService = orderQueryService;
     }
 
     @GetMapping("/export/stream")
@@ -66,7 +73,7 @@ public class OrderController {
     }
 
     @GetMapping
-    public Page<OrderEntity> findOrders(
+    public OrderSearchResponse findOrders(
         @RequestParam String customerId,
         @RequestParam String status,
         @RequestParam(defaultValue = "0") int page,
@@ -74,7 +81,8 @@ public class OrderController {
     ) {
         log.info("Searching orders. customerId={}, status={}, page={}. size={}", customerId, status, page, size);
         int safeSize = Math.min(size, 100);
-        return orderRepository.findByCustomerIdAndOrderStatus(customerId, status, PageRequest.of(page, safeSize));
+        //return orderRepository.findByCustomerIdAndOrderStatus(customerId, status, PageRequest.of(page, safeSize));
+        return orderQueryService.findOrders(customerId, status, page, safeSize);
     }
 
     @PostMapping

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.example.orderservice.dto.ErrorResponse;
 import com.example.orderservice.exception.ExportJobNotFoundException;
 import com.example.orderservice.exception.ExportJobNotReadyException;
+import com.example.orderservice.exception.RateLimitExceededException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -57,6 +58,19 @@ public class GlobalExceptionHandler {
             HttpStatus.FORBIDDEN,
             "FORBIDDEN",
             "Access denied",
+            request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
+        RateLimitExceededException ex,
+        HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "TOO_MANY_REQUESTS",
+            ex.getMessage(),
             request.getRequestURI()
         );
     }

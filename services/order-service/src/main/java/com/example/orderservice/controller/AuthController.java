@@ -1,5 +1,6 @@
 package com.example.orderservice.controller;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.orderservice.dto.LoginRequest;
 import com.example.orderservice.dto.TokenResponse;
+import com.example.orderservice.service.RateLimiterService;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,19 +31,24 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
+    private final RateLimiterService rateLimiterService;
 
     public AuthController(
         UserDetailsService userDetailsService,
         PasswordEncoder passwordEncoder,
-        JwtEncoder jwtEncoder
+        JwtEncoder jwtEncoder,
+        RateLimiterService rateLimiterService
     ) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
+        this.rateLimiterService = rateLimiterService;
     }
 
     @PostMapping("/token")
     public TokenResponse token(@RequestBody LoginRequest request) {
+        rateLimiterService.checkLimit("rate-limit:auth:" + request.username(), 5, Duration.ofMinutes(1));
+
         UserDetails user = userDetailsService.loadUserByUsername(request.username());
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {

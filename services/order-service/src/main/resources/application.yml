@@ -42,6 +42,14 @@ spring:
           payment-service:
             connectTimeout: 1000
             readTimeout: 2000
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+    redis:
+      time-to-live: 180s
   datasource:
     url: jdbc:postgresql://localhost:5432/orders_db
     username: orders_user
