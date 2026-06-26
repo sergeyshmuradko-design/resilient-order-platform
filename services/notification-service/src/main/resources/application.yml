@@ -1,0 +1,40 @@
+server:
+    port: 8083
+
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orders_db
+    username: orders_user
+    password: orders_pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false # Когда включено соединение держится принудительно на все время http запроса
+    hibernate:
+      ddl-auto: update
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+    listener:
+      simple:
+        acknowledge-mode: manual # (auto) Spring сам подтвердит сообщение, если метод успешно завершился.
+        default-requeue-rejected: false # Если listener выбросил exception, сообщение НЕ возвращается бесконечно в ту же очередь, а уходит в DLQ, если DLQ настроена.
+        retry:
+          enabled: false
+          max-attempts: 3 # попробовать обработать сообщение 3 раза
+          initial-interval: 1000 # пауза 1 секунда
+          multiplier: 2 # потом 2 секунды
+          max-interval: 5000 # потом максимум 5 секунд, если всё равно ошибка → reject → DLQ
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

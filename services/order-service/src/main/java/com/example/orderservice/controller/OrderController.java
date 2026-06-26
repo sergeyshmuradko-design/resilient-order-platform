@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.orderservice.dto.CreateOrderRequest;
+import com.example.orderservice.dto.OrderCreatedMessage;
 import com.example.orderservice.dto.OrderResponse;
 import com.example.orderservice.dto.OrderSearchResponse;
 import com.example.orderservice.dto.OrderSummaryResponse;
@@ -18,6 +19,7 @@ import com.example.orderservice.service.OrderExportService;
 import com.example.orderservice.service.OrderPersistenceService;
 import com.example.orderservice.service.OrderQueryService;
 import com.example.orderservice.service.ResilientPaymentService;
+import com.example.orderservice.service.rabbitmq.OrderEventPublisher;
 
 import java.io.PrintWriter;
 import java.time.Instant;
@@ -39,19 +41,22 @@ public class OrderController {
     private final OrderPersistenceService orderPersistenceService;
     private final OrderExportService orderExportService;
     private final OrderQueryService orderQueryService;
+    private final OrderEventPublisher orderEventPublisher;
 
     public OrderController(
         ResilientPaymentService paymentService,
         OrderRepository orderRepository,
         OrderPersistenceService orderPersistenceService,
         OrderExportService orderExportService,
-        OrderQueryService orderQueryService
+        OrderQueryService orderQueryService,
+        OrderEventPublisher orderEventPublisher
     ) {
         this.paymentService = paymentService;
         this.orderRepository = orderRepository;
         this.orderPersistenceService = orderPersistenceService;
         this.orderExportService = orderExportService;
         this.orderQueryService = orderQueryService;
+        this.orderEventPublisher = orderEventPublisher;
     }
 
     @GetMapping("/export/stream")
@@ -111,6 +116,17 @@ public class OrderController {
         orderPersistenceService.saveOrder(orderEntity);
         //orderPersistenceService.saveOrderWithArtificialDelay(orderEntity);
         //orderPersistenceService.saveOrderWithDelay(orderEntity);
+        orderEventPublisher.publishOrderCreated(
+            new OrderCreatedMessage(
+                UUID.randomUUID().toString(),
+                orderId,
+                request.customerId(),
+                request.productId(),
+                request.quantity(),
+                amount,
+                createdAt
+            )
+        );
 
         return new OrderResponse(
             orderId,

@@ -42,6 +42,15 @@ spring:
           payment-service:
             connectTimeout: 1000
             readTimeout: 2000
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    publisher-confirm-type: correlated # RabbitMQ подтвердит, что broker принял message.
+    publisher-returns: true # если message не смог попасть ни в одну queue, broker вернёт его producer’у.
+    template:
+      mandatory: true # требовать return для unroutable messages.
   data:
     redis:
       host: localhost

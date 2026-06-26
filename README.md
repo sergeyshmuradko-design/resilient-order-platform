@@ -1,18 +1,18 @@
 # resilient-order-platform
 
 ## start service
-./gradlew :services:payment-service:build :services:order-service:build
+./gradlew :services:notification-service:build :services:order-service:build
 ./gradlew :services:order-service:clean :services:order-service:build --refresh-dependencies
-docker compose up -d postgres redis
+docker compose up -d postgres redis rabbitmq
 ./gradlew :services:order-service:bootRun
 
 ## docker managing
 
-docker compose up -d postgres
+docker compose up -d postgres redis rabbitmq
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
-docker compose stop postgres
+docker compose stop postgres redis rabbitmq
 
 ## git managing
 
@@ -131,3 +131,12 @@ for i in {1..7}; do
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"wrong"}'
 done
+
+---
+
+## test rabbitmq
+
+curl -i -H "Authorization: Bearer $TOKEN" \
+  -X POST http://localhost:8081/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"CUST-RABBIT","productId":"PROD-1","quantity":2}'

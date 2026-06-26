@@ -1,4 +1,10 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: resilient-orders-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
   redis:
     image: redis:7
     container_name: resilient-orders-redis
