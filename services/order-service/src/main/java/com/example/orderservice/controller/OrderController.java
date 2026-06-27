@@ -113,20 +113,30 @@ public class OrderController {
             paymentStatus,
             createdAt);
 
-        orderPersistenceService.saveOrder(orderEntity);
-        //orderPersistenceService.saveOrderWithArtificialDelay(orderEntity);
-        //orderPersistenceService.saveOrderWithDelay(orderEntity);
-        orderEventPublisher.publishOrderCreated(
-            new OrderCreatedMessage(
-                UUID.randomUUID().toString(),
-                orderId,
-                request.customerId(),
-                request.productId(),
-                request.quantity(),
-                amount,
-                createdAt
-            )
+        OrderCreatedMessage message = new OrderCreatedMessage(
+            UUID.randomUUID().toString(),
+            orderId,
+            request.customerId(),
+            request.productId(),
+            request.quantity(),
+            amount,
+            createdAt
         );
+
+        orderPersistenceService.saveOrder(orderEntity, message);
+        //orderPersistenceService.saveOrderWithArtificialDelay(orderEntity);
+        //orderPersistenceService.saveOrderWithDelay(orderEntity, message);
+        // orderEventPublisher.publishOrderCreated(
+        //     new OrderCreatedMessage(
+        //         UUID.randomUUID().toString(),
+        //         orderId,
+        //         request.customerId(),
+        //         request.productId(),
+        //         request.quantity(),
+        //         amount,
+        //         createdAt
+        //     )
+        // );
 
         return new OrderResponse(
             orderId,

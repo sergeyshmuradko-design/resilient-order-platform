@@ -27,6 +27,9 @@ resilience4j:
 app:
   payment-client:
     type: feign
+  outbox:
+    publisher:
+      fixed-delay-ms: 5000
 
 security:
   jwt:
