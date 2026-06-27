@@ -139,7 +139,7 @@ done
 curl -i -H "Authorization: Bearer $TOKEN" \
   -X POST http://localhost:8081/orders \
   -H "Content-Type: application/json" \
-  -d '{"customerId":"CUST-RABBIT-3","productId":"PROD-1","quantity":2}'
+  -d '{"customerId":"CUST-RABBIT","productId":"PROD-1","quantity":2}'
 
 ## test transactional outbox
 

@@ -62,7 +62,7 @@ public class OrderEventPublisher {
 
         rabbitTemplate.convertAndSend(
             RabbitMqConfig.ORDER_EXCHANGE,
-            "wrong.routing.key",
+            RabbitMqConfig.ORDER_CREATED_ROUTING_KEY,
             message,
             rabbitMessage -> {
                 rabbitMessage.getMessageProperties().setCorrelationId(eventId);

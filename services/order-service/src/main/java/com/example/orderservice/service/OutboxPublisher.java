@@ -42,6 +42,7 @@ public class OutboxPublisher {
                     objectMapper.readValue(event.getPayload(), OrderCreatedMessage.class);
 
                 event.markProcessing();
+                outboxEventRepository.saveAndFlush(event); // TODO: Fix sync calls
 
                 orderEventPublisher.publishOrderCreated(event.getEventId(), message);
             } catch (Exception e) {
