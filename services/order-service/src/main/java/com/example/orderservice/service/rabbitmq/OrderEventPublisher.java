@@ -70,18 +70,5 @@ public class OrderEventPublisher {
             },
             correlationData
         );
-
-        // try {
-        //     CorrelationData.Confirm confirm =
-        //         correlationData.getFuture().get(5, TimeUnit.SECONDS);
-
-        //     if (!confirm.isAck()) {
-        //         return new RabbitPublishResult(false, false, confirm.getReason());
-        //     }
-
-        //     return new RabbitPublishResult(true, false, null);
-        // } catch (Exception e) {
-        //     return new RabbitPublishResult(false, false, e.getMessage());
-        // }
     }
 }
