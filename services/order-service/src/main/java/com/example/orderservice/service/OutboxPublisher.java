@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.orderservice.dto.OrderCreatedMessage;
-import com.example.orderservice.dto.RabbitPublishResult;
 import com.example.orderservice.entity.OutboxEventEntity;
 import com.example.orderservice.entity.OutboxEventStatus;
 import com.example.orderservice.repository.OutboxEventRepository;

@@ -1,8 +1,5 @@
 package com.example.orderservice.service.rabbitmq;
 
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
@@ -11,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 import com.example.orderservice.configuration.RabbitMqConfig;
 import com.example.orderservice.dto.OrderCreatedMessage;
-import com.example.orderservice.dto.RabbitPublishResult;
 import com.example.orderservice.service.OutboxEventService;
 
 @Service
@@ -59,10 +55,10 @@ public class OrderEventPublisher {
         });
     }
 
-    public RabbitPublishResult publishOrderCreated(String eventId, OrderCreatedMessage message) {
+    public void publishOrderCreated(String eventId, OrderCreatedMessage message) {
         CorrelationData correlationData = new CorrelationData(eventId);
 
-        log.info("Publishing OrderCreated message. orderId={}, correlationId={}", message.orderId(), eventId);
+        log.info("Publishing OrderCreated message. orderId={}, eventId={}", message.orderId(), eventId);
 
         rabbitTemplate.convertAndSend(
             RabbitMqConfig.ORDER_EXCHANGE,
@@ -75,17 +71,17 @@ public class OrderEventPublisher {
             correlationData
         );
 
-        try {
-            CorrelationData.Confirm confirm =
-                correlationData.getFuture().get(5, TimeUnit.SECONDS);
+        // try {
+        //     CorrelationData.Confirm confirm =
+        //         correlationData.getFuture().get(5, TimeUnit.SECONDS);
 
-            if (!confirm.isAck()) {
-                return new RabbitPublishResult(false, false, confirm.getReason());
-            }
+        //     if (!confirm.isAck()) {
+        //         return new RabbitPublishResult(false, false, confirm.getReason());
+        //     }
 
-            return new RabbitPublishResult(true, false, null);
-        } catch (Exception e) {
-            return new RabbitPublishResult(false, false, e.getMessage());
-        }
+        //     return new RabbitPublishResult(true, false, null);
+        // } catch (Exception e) {
+        //     return new RabbitPublishResult(false, false, e.getMessage());
+        // }
     }
 }
