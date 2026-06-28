@@ -45,6 +45,16 @@ spring:
           payment-service:
             connectTimeout: 1000
             readTimeout: 2000
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all # broker ждёт подтверждение от replicas
+      retries: 3 # producer повторит отправку при временной ошибке
+      properties:
+        enable.idempotence: true # защита от duplicate при retry producer'а
+        spring.json.add.type.headers: false
   rabbitmq:
     host: localhost
     port: 5672

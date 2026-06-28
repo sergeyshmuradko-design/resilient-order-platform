@@ -3,16 +3,80 @@
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build
 ./gradlew :services:order-service:clean :services:order-service:build --refresh-dependencies
-docker compose up -d postgres redis rabbitmq
+docker compose up -d postgres redis rabbitmq kafka
 ./gradlew :services:order-service:bootRun
+./gradlew :services:notification-service:bootRun \
+  --args='--server.port=8084'
 
 ## docker managing
 
-docker compose up -d postgres redis rabbitmq
+docker compose up -d postgres redis rabbitmq kafka
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
-docker compose stop postgres redis rabbitmq
+docker compose stop
+
+## kafka managing
+
+### run kafka
+docker compose up -d kafka
+
+### check kafka
+docker logs resilient-orders-kafka --tail=50
+
+### create kafka topic
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create \
+  --topic order.created.events \
+  --partitions 3 \
+  --replication-factor 1
+
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create \
+  --topic order.created.events.DLT \
+  --partitions 3 \
+  --replication-factor 1
+
+### delete kafka topic
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --delete \
+  --topic order.created.events
+
+### lookup kafka topic
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --list
+
+### lookup kafka message
+
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic order.created.events \
+  --from-beginning \
+  --max-messages 1
+
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic order.created.events.DLT \
+  --from-beginning \
+  --max-messages 1
+
+### lookup kafka consumer group
+
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 \
+  --describe \
+  --group notification-service
 
 ## git managing
 
@@ -144,5 +208,14 @@ curl -i -H "Authorization: Bearer $TOKEN" \
 ## test transactional outbox
 
 curl -i -H "Authorization: Bearer $TOKEN" \
-  -X POST http://localhost:8081/outbox/publish \
-  -H "Content-Type: application/json"
+  -X POST http://localhost:8081/outbox/publish
+
+## test kafka event
+
+curl -i -H "Authorization: Bearer $TOKEN" \
+  -X POST http://localhost:8081/kafka/publish-test
+
+for i in {1..10}; do
+  curl -s -H "Authorization: Bearer $TOKEN" \
+    -X POST http://localhost:8081/kafka/publish-test
+done
