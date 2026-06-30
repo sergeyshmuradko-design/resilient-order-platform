@@ -3,14 +3,14 @@
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build
 ./gradlew :services:order-service:clean :services:order-service:build --refresh-dependencies
-docker compose up -d postgres redis rabbitmq kafka
+docker compose up -d postgres redis rabbitmq kafka schema-registry
 ./gradlew :services:order-service:bootRun
 ./gradlew :services:notification-service:bootRun \
   --args='--server.port=8084'
 
 ## docker managing
 
-docker compose up -d postgres redis rabbitmq kafka
+docker compose up -d postgres redis rabbitmq kafka schema-registry
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
@@ -18,11 +18,18 @@ docker compose stop
 
 ## kafka managing
 
+### generate avro classes
+./gradlew :services:order-service:generateAvroJava
+
 ### run kafka
-docker compose up -d kafka
+docker compose up -d kafka schema-registry
 
 ### check kafka
 docker logs resilient-orders-kafka --tail=50
+docker logs resilient-orders-schema-registry --tail=80
+curl http://localhost:8085/subjects
+curl http://localhost:8085/subjects/order.created.events.avro-value/versions
+curl http://localhost:8085/config/order.created.events.avro-value
 
 ### create kafka topic
 docker exec -it resilient-orders-kafka \
@@ -53,6 +60,13 @@ docker exec -it resilient-orders-kafka \
   /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server localhost:9092 \
   --list
+
+## lookup producer console
+
+docker exec -it resilient-orders-kafka \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic order.created.events
 
 ### lookup kafka message
 
@@ -219,3 +233,21 @@ for i in {1..10}; do
   curl -s -H "Authorization: Bearer $TOKEN" \
     -X POST http://localhost:8081/kafka/publish-test
 done
+
+echo '{"messageId":"BAD-1","orderId":"ORDER-BAD-1","customerId":"CUST","productId":"PROD","quantity":"not-a-number","amount":99.99,"createdAt":"2026-06-30T12:00:00Z"}' | docker exec -i resilient-orders-kafka \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic order.created.events
+
+## test avro
+
+cat > /tmp/bad-order-schema.json <<'EOF'
+{
+  "schema": "{\"type\":\"record\",\"name\":\"OrderCreatedEvent\",\"namespace\":\"com.example.orderservice.avro\",\"fields\":[{\"name\":\"messageId\",\"type\":\"string\"},{\"name\":\"orderId\",\"type\":\"string\"},{\"name\":\"customerId\",\"type\":\"string\"},{\"name\":\"productId\",\"type\":\"string\"},{\"name\":\"quantity\",\"type\":\"string\"},{\"name\":\"amount\",\"type\":\"double\"},{\"name\":\"createdAt\",\"type\":\"string\"},{\"name\":\"source\",\"type\":\"string\",\"default\":\"order-service\"}]}"
+}
+EOF
+
+curl -X POST \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data @/tmp/bad-order-schema.json \
+  http://localhost:8085/compatibility/subjects/order.created.events.avro-value/versions/latest

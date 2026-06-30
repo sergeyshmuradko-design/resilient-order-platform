@@ -1,0 +1,15 @@
+{
+    "type": "record",
+    "name": "OrderCreatedEvent",
+    "namespace": "com.example.orderservice.avro",
+    "fields": [
+        { "name": "messageId", "type": "string" },
+        { "name": "orderId", "type": "string" },
+        { "name": "customerId", "type": "string" },
+        { "name": "productId", "type": "string" },
+        { "name": "quantity", "type": "int" },
+        { "name": "amount", "type": "double" },
+        { "name": "createdAt", "type": "string" },
+        { "name": "source", "type": "string", "default": "order-service" }
+    ]
+}

@@ -7,6 +7,8 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9092
+    listener:
+      ack-mode: manual
     producer: # notification-service не только consumer, но и producer в DLT. А producer по умолчанию пытается отправить value как String
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -15,9 +17,11 @@ spring:
     consumer:
       group-id: notification-service # имя consumer group. Kafka хранит offset отдельно для этой группы.
       auto-offset-reset: earliest # если у группы ещё нет offset, читать с начала topic.
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.use.type.header: false
         spring.json.trusted.packages: "com.example.notificationservice.dto,com.example.orderservice.dto"
         spring.json.value.default.type: com.example.notificationservice.dto.OrderCreatedMessage
