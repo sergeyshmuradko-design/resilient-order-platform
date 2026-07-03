@@ -49,6 +49,8 @@ public class KafkaRawProducerConfig {
     @Bean
     @Primary
     public KafkaTemplate<String, OrderCreatedMessage> orderCreatedKafkaTemplate(ProducerFactory<String, OrderCreatedMessage> orderCreatedProducerFactory) {
-        return new KafkaTemplate<>(orderCreatedProducerFactory);
+        KafkaTemplate<String, OrderCreatedMessage> template = new KafkaTemplate<>(orderCreatedProducerFactory);
+        template.setObservationEnabled(true);
+        return template;
     }
 }

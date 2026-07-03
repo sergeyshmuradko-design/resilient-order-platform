@@ -40,6 +40,7 @@ public class KafkaAvroConsumerConfig {
             new ConcurrentKafkaListenerContainerFactory<>();
 
         factory.setConsumerFactory(avroOrderCreatedConsumerFactory);
+        factory.getContainerProperties().setObservationEnabled(true);
 
         return factory;
     }

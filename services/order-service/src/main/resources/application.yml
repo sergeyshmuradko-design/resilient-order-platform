@@ -3,7 +3,8 @@ server:
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+    level: "%5p [traceId=%X{traceId:-}, spanId=%X{spanId:-}]"
+    # console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
 
 resilience4j:
   bulkhead:
@@ -46,6 +47,8 @@ spring:
             connectTimeout: 1000
             readTimeout: 2000
   kafka:
+    template:
+      observation-enabled: true
     bootstrap-servers: localhost:9092
     properties:
       schema.registry.url: http://localhost:8085
@@ -66,6 +69,7 @@ spring:
     publisher-returns: true # если message не смог попасть ни в одну queue, broker вернёт его producer’у.
     template:
       mandatory: true # требовать return для unroutable messages.
+      observation-enabled: true
   data:
     redis:
       host: localhost
@@ -108,3 +112,9 @@ management:
     web:
       exposure:
         include: health,info,metrics
+  tracing:
+    sampling:
+      probability: 1.0 # локально отправляем 100% traces
+  otlp:
+    tracing:
+      endpoint: http://localhost:4318/v1/traces # отправляем traces в Jaeger через OTLP HTTP

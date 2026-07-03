@@ -35,6 +35,8 @@ public class KafkaAvroProducerConfig {
     public KafkaTemplate<String, OrderCreatedEvent> avroOrderCreatedKafkaTemplate(
         ProducerFactory<String, OrderCreatedEvent> avroOrderCreatedProducerFactory
     ) {
-        return new KafkaTemplate<>(avroOrderCreatedProducerFactory);
+        KafkaTemplate<String, OrderCreatedEvent> template = new KafkaTemplate<>(avroOrderCreatedProducerFactory);
+        template.setObservationEnabled(true);
+        return template;
     }
 }

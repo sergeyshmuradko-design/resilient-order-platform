@@ -3,14 +3,14 @@
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build
 ./gradlew :services:order-service:clean :services:order-service:build --refresh-dependencies
-docker compose up -d postgres redis rabbitmq kafka schema-registry
+docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
 ./gradlew :services:order-service:bootRun
 ./gradlew :services:notification-service:bootRun \
   --args='--server.port=8084'
 
 ## docker managing
 
-docker compose up -d postgres redis rabbitmq kafka schema-registry
+docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
@@ -239,6 +239,11 @@ echo '{"messageId":"BAD-1","orderId":"ORDER-BAD-1","customerId":"CUST","productI
   --bootstrap-server localhost:9092 \
   --topic order.created.events
 
+echo '{"messageId":"GOOD-1","orderId":"ORDER-GOOD-1","customerId":"CUST","productId":"PROD","quantity":1,"amount":99.99,"createdAt":"2026-06-30T12:00:00Z"}' | docker exec -i resilient-orders-kafka \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic order.created.events
+
 ## test avro
 
 cat > /tmp/bad-order-schema.json <<'EOF'
@@ -251,3 +256,15 @@ curl -X POST \
   -H "Content-Type: application/vnd.schemaregistry.v1+json" \
   --data @/tmp/bad-order-schema.json \
   http://localhost:8085/compatibility/subjects/order.created.events.avro-value/versions/latest
+
+  ## check jaeger
+
+curl -i http://localhost:8081/actuator/health
+
+curl -i -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8081/orders?customerId=CUST-1
+
+curl -i -H "Authorization: Bearer $TOKEN" \
+  -X POST http://localhost:8081/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"CUST-TRACE","productId":"PROD-1","quantity":2}'
