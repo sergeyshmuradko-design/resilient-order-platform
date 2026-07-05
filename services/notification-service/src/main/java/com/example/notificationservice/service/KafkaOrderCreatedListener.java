@@ -31,13 +31,12 @@ public class KafkaOrderCreatedListener {
         OrderCreatedMessage message = record.value();
 
         log.info(
-            "Kafka OrderCreated received. topic={}, partition={}, offset={}, key={}, orderId={}, messageId={}",
-            record.topic(),
-            record.partition(),
-            record.offset(),
-            record.key(),
+            "Kafka event received. eventType=OrderCreated, orderId={}, messageId={}, customerId={}, partition={}, offset={}",
             message.orderId(),
-            message.messageId()
+            message.messageId(),
+            message.customerId(),
+            record.partition(),
+            record.offset()
         );
 
         boolean processed = idempotentNotificationService.tryProcess(message);

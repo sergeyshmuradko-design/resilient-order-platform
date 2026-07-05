@@ -20,6 +20,12 @@ public class KafkaOrderEventPublisher {
     }
 
     public void publish(OrderCreatedMessage message) {
+        log.info(
+            "Kafka publish requested. eventType=OrderCreated, orderId={}, messageId={}, customerId={}",
+            message.orderId(),
+            message.messageId(),
+            message.customerId()
+        );
         kafkaTemplate.send(ORDER_CREATED_TOPIC, message.orderId(), message)
             .whenComplete((result, ex) -> {
                 if (ex != null) {

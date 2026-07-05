@@ -28,6 +28,8 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
+    implementation 'de.siegmar:logback-gelf:6.1.2'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 

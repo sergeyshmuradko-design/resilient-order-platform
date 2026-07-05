@@ -1,4 +1,32 @@
 services:
+  graylog-mongodb: # хранит настройки Graylog: users, dashboards, inputs, streams
+    image: mongo:7
+    container_name: resilient-orders-graylog-mongodb
+  graylog-opensearch: # хранит сами логи и делает поиск по ним
+    image: opensearchproject/opensearch:2.15.0
+    container_name: resilient-orders-graylog-opensearch
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: true
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: "Local.Dev#OpenSearch.2026!R7x"
+      OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
+    ports:
+      - "9200:9200"
+  graylog:
+    image: graylog/graylog:6.1
+    container_name: resilient-orders-graylog
+    depends_on:
+      - graylog-mongodb
+      - graylog-opensearch
+    ports:
+      - "9000:9000" # Graylog UI
+      - "12201:12201/udp" # GELF input для логов
+    environment:
+      GRAYLOG_PASSWORD_SECRET: "some-long-random-secret-for-local-dev"
+      GRAYLOG_ROOT_PASSWORD_SHA2: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918" # admin
+      GRAYLOG_HTTP_EXTERNAL_URI: "http://localhost:9000/"
+      GRAYLOG_MONGODB_URI: "mongodb://graylog-mongodb:27017/graylog"
+      GRAYLOG_ELASTICSEARCH_HOSTS: "http://graylog-opensearch:9200"
   jaeger:
     image: jaegertracing/all-in-one:1.60
     container_name: resilient-orders-jaeger

@@ -44,6 +44,13 @@ public class OutboxPublisher {
                 event.markProcessing();
                 outboxEventRepository.saveAndFlush(event); // TODO: Fix sync calls
 
+                log.info(
+                    "Outbox event publishing. eventId={}, eventType={}, status={}",
+                    event.getEventId(),
+                    event.getEventType(),
+                    event.getStatus()
+                );
+
                 orderEventPublisher.publishOrderCreated(event.getEventId(), message);
             } catch (Exception e) {
                 log.error("Failed to publish outbox event. eventId={}", event.getEventId(), e);

@@ -16,6 +16,21 @@ docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
 docker compose stop
 
+## graylog managing
+
+docker compose rm -f graylog-opensearch graylog
+docker compose up -d graylog-mongodb graylog-opensearch graylog
+docker logs resilient-orders-graylog --tail=50
+docker logs resilient-orders-graylog-opensearch --tail=80
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+http://localhost:9000
+System -> Inputs -> GELF UDP
+Title: Local GELF UDP
+Bind address: 0.0.0.0
+Port: 12201
+curl http://localhost:8081/actuator/health
+docker compose stop
+
 ## kafka managing
 
 ### generate avro classes
@@ -257,7 +272,7 @@ curl -X POST \
   --data @/tmp/bad-order-schema.json \
   http://localhost:8085/compatibility/subjects/order.created.events.avro-value/versions/latest
 
-  ## check jaeger
+## check jaeger
 
 curl -i http://localhost:8081/actuator/health
 

@@ -47,6 +47,8 @@ dependencies {
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp' // sends traces to Jaeger/OTLP
     // implementation 'org.springframework.boot:spring-boot-starter-opentelemetry' replace for spring boot 4
 
+    implementation 'de.siegmar:logback-gelf:6.1.2'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
