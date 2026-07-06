@@ -8,9 +8,13 @@ docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
 ./gradlew :services:notification-service:bootRun \
   --args='--server.port=8084'
 
+./gradlew :services:order-service:clean :services:order-service:bootJar
+docker build -t resilient-orders/order-service:local services/order-service
+docker build -t resilient-orders/notification-service:local services/notification-service
+
 ## docker managing
 
-docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
+docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger order-service notification-service
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
@@ -28,7 +32,7 @@ System -> Inputs -> GELF UDP
 Title: Local GELF UDP
 Bind address: 0.0.0.0
 Port: 12201
-curl http://localhost:8081/actuator/health
+curl -i http://localhost:8081/actuator/health
 docker compose stop
 
 ## kafka managing

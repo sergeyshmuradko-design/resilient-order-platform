@@ -90,6 +90,52 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+  order-service:
+    image: resilient-orders/order-service:local
+    container_name: resilient-orders-order-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - kafka
+      - jaeger
+  notification-service:
+    image: resilient-orders/notification-service:local
+    container_name: resilient-orders-notification-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
+    depends_on:
+      - postgres
+      - rabbitmq
+      - kafka
+      - jaeger
+  fluent-bit:
+    image: fluent/fluent-bit:3.1
+    container_name: resilient-orders-fluent-bit
+    depends_on:
+      - graylog
+      - order-service
+      - notification-service
+    volumes:
+      # Fluent Bit config.
+      - ./infra/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+
+      # Docker container logs on the host.
+      # Fluent Bit reads stdout/stderr logs from containers here.
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
 
 volumes:
   postgres_data:
