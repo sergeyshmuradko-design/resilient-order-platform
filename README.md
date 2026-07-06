@@ -2,7 +2,7 @@
 
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build
-./gradlew :services:order-service:clean :services:order-service:build --refresh-dependencies
+./gradlew :services:notification-service:build :services:order-service:build :services:payment-service:build --refresh-dependencies
 docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
 ./gradlew :services:order-service:bootRun
 ./gradlew :services:notification-service:bootRun \
