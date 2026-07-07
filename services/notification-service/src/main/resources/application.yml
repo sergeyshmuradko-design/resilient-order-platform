@@ -17,6 +17,8 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9092
+    properties:
+      schema.registry.url: http://localhost:8085
     listener:
       ack-mode: manual
       observation-enabled: true

@@ -1,10 +1,214 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: resilient-orders-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orders_db
+      POSTGRES_USER: orders_user
+      POSTGRES_PASSWORD: orders_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orders_user -d orders_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7
+    container_name: resilient-orders-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: resilient-orders-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  kafka:
+    image: apache/kafka:3.8.1
+    container_name: resilient-orders-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/tmp/kafka-logs
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      KAFKA_LISTENERS: PLAINTEXT://:9092,DOCKER://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,DOCKER://kafka:29092 # localhost:9092 → для Spring Boot сервисов, которые запускаются снаружи контейнера, kafka:29092 → для других контейнеров внутри docker-compose network, например schema-registry
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 40s
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:8.3.0
+    container_name: resilient-orders-schema-registry
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8085:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: resilient-orders-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317" # OTLP gRPC endpoint
+      - "4318:4318" # OTLP HTTP endpoint
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+
+  payment-service:
+    image: resilient-orders/payment-service:local
+    container_name: resilient-orders-payment-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+    depends_on:
+      - jaeger
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  order-service:
+    image: resilient-orders/order-service:local
+    container_name: resilient-orders-order-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
+      SPRING_DATASOURCE_USERNAME: orders_user
+      SPRING_DATASOURCE_PASSWORD: orders_pass
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      SERVICES_PAYMENT_BASE_URL: http://payment-service:8082
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  notification-service:
+    image: resilient-orders/notification-service:local
+    container_name: resilient-orders-notification-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
+      SPRING_DATASOURCE_USERNAME: orders_user
+      SPRING_DATASOURCE_PASSWORD: orders_pass
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+
   graylog-mongodb: # хранит настройки Graylog: users, dashboards, inputs, streams
     image: mongo:7
     container_name: resilient-orders-graylog-mongodb
+    restart: unless-stopped
+    profiles: ["observability"]
+    volumes:
+      - graylog_mongodb_data:/data/db
+
   graylog-opensearch: # хранит сами логи и делает поиск по ним
     image: opensearchproject/opensearch:2.15.0
     container_name: resilient-orders-graylog-opensearch
+    restart: unless-stopped
+    profiles: ["observability"]
     environment:
       discovery.type: single-node
       plugins.security.disabled: true
@@ -12,9 +216,15 @@ services:
       OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
     ports:
       - "9200:9200"
+    volumes:
+      - graylog_opensearch_data:/usr/share/opensearch/data
+    mem_limit: 768m
+
   graylog:
     image: graylog/graylog:6.1
     container_name: resilient-orders-graylog
+    restart: unless-stopped
+    profiles: ["observability"]
     depends_on:
       - graylog-mongodb
       - graylog-opensearch
@@ -27,110 +237,19 @@ services:
       GRAYLOG_HTTP_EXTERNAL_URI: "http://localhost:9000/"
       GRAYLOG_MONGODB_URI: "mongodb://graylog-mongodb:27017/graylog"
       GRAYLOG_ELASTICSEARCH_HOSTS: "http://graylog-opensearch:9200"
-  jaeger:
-    image: jaegertracing/all-in-one:1.60
-    container_name: resilient-orders-jaeger
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "4317:4317" # OTLP gRPC endpoint
-      - "4318:4318" # OTLP HTTP endpoint
-    environment:
-      COLLECTOR_OTLP_ENABLED: true
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: resilient-orders-rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-  redis:
-    image: redis:7
-    container_name: resilient-orders-redis
-    ports:
-      - "6379:6379"
-  postgres:
-    image: postgres:16
-    container_name: resilient-orders-postgres
-    environment:
-      POSTGRES_DB: orders_db
-      POSTGRES_USER: orders_user
-      POSTGRES_PASSWORD: orders_pass
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-  kafka:
-    image: apache/kafka:3.8.1
-    container_name: resilient-orders-kafka
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+    mem_limit: 768m
 
-      KAFKA_LISTENERS: PLAINTEXT://:9092,DOCKER://:29092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,DOCKER://kafka:29092 # localhost:9092 → для Spring Boot сервисов, которые запускаются снаружи контейнера, kafka:29092 → для других контейнеров внутри docker-compose network, например schema-registry
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
-
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-  schema-registry:
-    image: confluentinc/cp-schema-registry:8.3.0
-    container_name: resilient-orders-schema-registry
-    depends_on:
-      - kafka
-    ports:
-      - "8085:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
-  order-service:
-    image: resilient-orders/order-service:local
-    container_name: resilient-orders-order-service
-    ports:
-      - "8081:8081"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - kafka
-      - jaeger
-  notification-service:
-    image: resilient-orders/notification-service:local
-    container_name: resilient-orders-notification-service
-    ports:
-      - "8083:8083"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
-    depends_on:
-      - postgres
-      - rabbitmq
-      - kafka
-      - jaeger
   fluent-bit:
     image: fluent/fluent-bit:3.1
     container_name: resilient-orders-fluent-bit
+    restart: unless-stopped
+    profiles: ["observability"]
     depends_on:
       - graylog
       - order-service
       - notification-service
     volumes:
-      # Fluent Bit config.
+      # Fluent Bit runtime configuration.
       - ./infra/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
 
       # Docker container logs on the host.
@@ -139,3 +258,8 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
+  rabbitmq_data:
+  kafka_data:
+  graylog_mongodb_data:
+  graylog_opensearch_data:

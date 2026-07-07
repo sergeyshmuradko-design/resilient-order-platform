@@ -11,9 +11,12 @@ docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
 ./gradlew :services:order-service:clean :services:order-service:bootJar
 docker build -t resilient-orders/order-service:local services/order-service
 docker build -t resilient-orders/notification-service:local services/notification-service
+docker build -t resilient-orders/payment-service:local services/payment-service
 
 ## docker managing
 
+docker compose up -d --force-recreate
+docker compose --profile observability up -d
 docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger order-service notification-service
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
@@ -209,10 +212,8 @@ curl http://localhost:8081/actuator/health
 
 ---
 
-TOKEN=$(curl -s -X POST http://localhost:8081/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}' \
-  | jq -r '.accessToken')
+
+
 
 echo $TOKEN
 
