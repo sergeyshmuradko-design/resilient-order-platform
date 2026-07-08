@@ -15,13 +15,16 @@ docker build -t resilient-orders/payment-service:local services/payment-service
 
 ## docker managing
 
-docker compose up -d --force-recreate
+docker compose config
+docker compose --profile observability up -d --force-recreate
 docker compose --profile observability up -d
+docker compose --profile observability up -d --no-deps fluent-bit
 docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger order-service notification-service
 docker ps
 docker exec -it resilient-orders-postgres psql -U orders_user -d orders_db
 \q
 docker compose stop
+docker compose --profile observability stop
 
 ## graylog managing
 
@@ -212,8 +215,10 @@ curl http://localhost:8081/actuator/health
 
 ---
 
-
-
+TOKEN=$(curl -s -X POST http://localhost:8081/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  | jq -r '.accessToken')
 
 echo $TOKEN
 
