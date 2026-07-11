@@ -37,6 +37,7 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/actuator/health",
+                    "/actuator/prometheus",
                     "/auth/token"
                 ).permitAll()
 

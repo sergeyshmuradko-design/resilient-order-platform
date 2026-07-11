@@ -7,3 +7,4 @@ out/
 .vscode/
 bin/
 **/exports/
+infra/fluent-bit/output/

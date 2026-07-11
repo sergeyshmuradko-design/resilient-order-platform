@@ -16,7 +16,31 @@ spring:
     name: payment-service
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        # Включает histogram buckets для всех HTTP server timers.
+        # Благодаря этому Prometheus сможет считать p95/p99 через
+        # histogram_quantile(), в том числе после масштабирования сервиса.
+        http.server.requests: true
+
+      minimum-expected-value:
+        # Нижняя ожидаемая граница HTTP latency.
+        # Помогает Micrometer не создавать ненужные buckets ниже 5 ms.
+        http.server.requests: 5ms
+
+      maximum-expected-value:
+        # Верхняя ожидаемая граница.
+        # запросы дольше всё равно попадут в +Inf bucket.
+        http.server.requests: 10s
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # health нужен для проверки состояния,
+        # prometheus — для scrape Prometheus server.
+        include: health,prometheus
+  endpoint:
+    health:
+      # Позже здесь увидим состояние DB, Redis, RabbitMQ и Kafka,
+      # если соответствующие health indicators доступны.
+      show-details: when-authorized

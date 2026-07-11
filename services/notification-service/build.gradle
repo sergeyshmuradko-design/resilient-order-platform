@@ -28,6 +28,11 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
+    // Экспортирует Micrometer metrics в формате, который понимает Prometheus.
+    // Java-код напрямую классы этой библиотеки пока не использует.
+    // Она нужна во время запуска, чтобы Spring Boot автоматически создал Prometheus meter registry и endpoint.
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 

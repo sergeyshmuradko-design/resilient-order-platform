@@ -105,6 +105,19 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: true
 
+  prometheus:
+    image: prom/prometheus
+    container_name: resilient-orders-prometheus
+    ports:
+      - "9090:9090" # Prometheus UI и HTTP API.
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro # Конфигурация targets и scrape interval.
+      - prometheus_data:/prometheus # Сохраняем историю метрик между пересозданиями контейнера.
+    depends_on:
+      - order-service
+      - notification-service
+      - payment-service
+
   payment-service:
     image: resilient-orders/payment-service:local
     container_name: resilient-orders-payment-service
@@ -248,18 +261,26 @@ services:
       - graylog
       - order-service
       - notification-service
+      - payment-service
     volumes:
-      # Fluent Bit runtime configuration.
+      # Основная конфигурация Fluent Bit.
       - ./infra/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
 
-      # Docker container logs on the host.
-      # Fluent Bit reads stdout/stderr logs from containers here.
+      # Custom parser for Spring Boot JSON logs.
+      - ./infra/fluent-bit/custom-parsers.conf:/fluent-bit/etc/custom-parsers.conf:ro
+
+      # Docker-файлы stdout/stderr всех контейнеров.
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-fluent
+
+      # Каталог для тестового результата.
+      # Fluent Bit пишет сюда уже собранные записи.
+      - ./infra/fluent-bit/output:/fluent-bit/collected
+
 volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
   kafka_data:
+  prometheus_data:
   graylog_mongodb_data:
   graylog_opensearch_data:
