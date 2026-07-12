@@ -10,6 +10,7 @@ docker compose up -d postgres redis rabbitmq kafka schema-registry jaeger
 
 ./gradlew :services:order-service:clean :services:order-service:bootJar
 docker compose rm -f notification-service order-service payment-service
+docker compose up -d --build
 docker build -t resilient-orders/order-service:local services/order-service
 docker build -t resilient-orders/notification-service:local services/notification-service
 docker build -t resilient-orders/payment-service:local services/payment-service
@@ -26,6 +27,8 @@ docker compose --profile observability rm -f
 docker volume rm resilient-order-platform_kafka_data
 docker volume prune (Удалить anonymous volumes)
 docker compose up -d --force-recreate fluent-bit (recreate container)
+docker inspect resilient-orders-order-service \
+  --format='restartCount={{.RestartCount}} status={{.State.Status}} oomKilled={{.State.OOMKilled}}'
 
 docker compose config
 docker compose --profile observability up -d --force-recreate
@@ -314,6 +317,219 @@ curl http://localhost:8083/actuator/prometheus
 curl -s http://localhost:8081/actuator/prometheus \
   | grep -E "http_server|jvm_memory|jvm_gc|process_cpu|hikaricp|tomcat_threads" \
   | head -100
+
+### load test jvm
+
+sum(jvm_memory_used_bytes{
+  job="order-service",
+  area="heap"
+})
+
+100 *
+sum(jvm_memory_used_bytes{
+  job="order-service",
+  area="heap"
+})
+/
+sum(jvm_memory_max_bytes{
+  job="order-service",
+  area="heap"
+})
+
+time curl -i \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8081/internal/load-test/memory?megabytes=120&holdMilliseconds=10000"
+
+sum(jvm_memory_used_bytes{
+  job="order-service",
+  area="heap"
+})
+
+jvm_memory_used_bytes{
+  job="order-service",
+  id=~".*Old.*"
+}
+
+rate(jvm_gc_pause_seconds_count{
+  job="order-service"
+}[1m])
+
+rate(jvm_gc_pause_seconds_sum{
+  job="order-service"
+}[1m])
+
+process_cpu_usage{
+  job="order-service"
+}
+
+### load test Hikari
+
+time curl -i \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8081/internal/load-test/database?milliseconds=1000"
+
+curl -i \
+  "http://localhost:8081/internal/load-test/database?milliseconds=1000"
+
+seq 1 20 | xargs -n1 -P20 -I{} \
+  curl -s \
+  -o /dev/null \
+  -w "request={} status=%{http_code} time=%{time_total}\n" \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8081/internal/load-test/database?milliseconds=5000"
+
+promql:
+
+hikaricp_connections_active{job="order-service"}
+
+hikaricp_connections_max{job="order-service"}
+
+hikaricp_connections_pending{job="order-service"}
+
+hikaricp_connections_timeout_total{job="order-service"}
+
+p95 for load-test endpoint:
+
+histogram_quantile(
+  0.95,
+  sum by (le) (
+    rate(http_server_requests_seconds_bucket{
+      job="order-service",
+      uri="/internal/load-test/database"
+    }[5m])
+  )
+)
+
+Ошибки endpoint:
+
+sum by (status) (
+  rate(http_server_requests_seconds_count{
+    job="order-service",
+    uri="/internal/load-test/database"
+  }[5m])
+)
+
+процент ошибок:
+
+100 *
+sum(
+  rate(http_server_requests_seconds_count{
+    job="order-service",
+    uri="/internal/load-test/database",
+    status=~"5.."
+  }[5m])
+)
+/
+sum(
+  rate(http_server_requests_seconds_count{
+    job="order-service",
+    uri="/internal/load-test/database"
+  }[5m])
+)
+
+---
+
+Heap usage в процентах:
+
+100 *
+sum(jvm_memory_used_bytes{
+  job="order-service",
+  area="heap"
+})
+/
+sum(jvm_memory_max_bytes{
+  job="order-service",
+  area="heap"
+})
+
+jvm_memory_used_bytes{
+  job="order-service",
+  area="heap"
+}
+
+jvm_memory_used_bytes{
+  job="order-service",
+  id=~".*Old.*"
+}
+
+---
+
+Количество пауз в секунду:
+
+rate(jvm_gc_pause_seconds_count{
+  job="order-service"
+}[5m])
+
+Суммарная доля времени в GC:
+
+rate(jvm_gc_pause_seconds_sum{
+  job="order-service"
+}[5m])
+
+Средняя пауза:
+
+rate(jvm_gc_pause_seconds_sum{
+  job="order-service"
+}[5m])
+/
+rate(jvm_gc_pause_seconds_count{
+  job="order-service"
+}[5m])
+
+Allocation pressure:
+
+jvm_gc_memory_allocated_bytes_total{
+  job="order-service"
+}
+
+rate(jvm_gc_memory_allocated_bytes_total{
+  job="order-service"
+}[5m])
+
+---
+
+CPU и GC вместе:
+
+process_cpu_usage{job="order-service"}
+
+rate(jvm_gc_pause_seconds_sum{job="order-service"}[5m])
+
+Типичные выводы:
+
+heap высокий, GC редкий, latency нормальная
+→ JVM просто использует доступную память
+
+heap быстро растёт и падает, GC частый
+→ высокая allocation pressure
+
+Old Gen растёт, после GC почти не уменьшается
+→ возможная утечка или неограниченный cache
+
+GC pauses растут вместе с p95/p99
+→ GC начинает влиять на пользователей
+
+---
+
+Threads:
+
+jvm_threads_live_threads{job="order-service"}
+
+jvm_threads_peak_threads{job="order-service"}
+
+tomcat_threads_busy_threads{job="order-service"}
+
+tomcat_threads_config_max_threads{job="order-service"}
+
+Интерпретация:
+
+Tomcat busy близко к max
+→ HTTP thread pool насыщен
+
+JVM threads постоянно растут
+→ возможна утечка потоков или неконтролируемое создание executors
+
+threads много, CPU низкий
+→ большинство потоков чего-то ждут
 
 ## Prometheus Metrics
 
