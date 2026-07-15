@@ -14,6 +14,7 @@ docker compose up -d --build
 docker build -t resilient-orders/order-service:local services/order-service
 docker build -t resilient-orders/notification-service:local services/notification-service
 docker build -t resilient-orders/payment-service:local services/payment-service
+sudo chmod 666 order-service-oom.hprof
 
 ## docker managing
 

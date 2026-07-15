@@ -1,0 +1,43 @@
+# Отдельное имя Compose project не позволяет Docker
+# считать контейнеры основного стека orphan-контейнерами.
+name: resilient-orders-diagnostics
+
+services:
+  mat-headless:
+    # Одноразовый диагностический image с Java 21 и Eclipse MAT.
+    build:
+      context: ./infra/mat
+      dockerfile: Dockerfile
+
+    image: resilient-orders/mat-headless:local
+
+    # Запускаем MAT с UID/GID пользователя Codespaces.
+    # Благодаря этому индексы и ZIP-отчёты рядом с heap dump
+    # не будут принадлежать root.
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+
+    environment:
+      # Heap JVM, в которой работает сам Eclipse MAT.
+      # Это не heap анализируемого order-service.
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx2g"
+
+      # Используем стандартный writable-каталог контейнера
+      # как домашний каталог для Eclipse/Java.
+      HOME: /tmp
+
+    # ParseHeapDump.sh запускает Eclipse Platform.
+    # Eclipse создаёт служебный workspace относительно текущего каталога:
+    #
+    # /tmp/workspace/.metadata
+    #
+    # Обычный /tmp доступен непривилегированному пользователю.
+    working_dir: /tmp
+
+    volumes:
+      # MAT читает heap dump и создаёт рядом с ним:
+      # - index-файлы;
+      # - thread-файлы;
+      # - ZIP с HTML-отчётом.
+      #
+      # Поэтому mount намеренно writable и не имеет :ro.
+      - ./infra/heap-dumps:/work/dumps
