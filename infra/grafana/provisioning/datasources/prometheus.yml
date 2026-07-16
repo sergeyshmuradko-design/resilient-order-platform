@@ -1,0 +1,27 @@
+# Grafana provisioning configuration for Prometheus.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+
+    # Built-in Grafana datasource type.
+    type: prometheus
+
+    # Makes this datasource available for queries.
+    access: proxy
+
+    # Grafana runs inside the Docker Compose network.
+    # Therefore it connects through the Compose service name,
+    # not through localhost.
+    url: http://prometheus:9090
+
+    # Use this datasource by default for new dashboard panels.
+    isDefault: true
+
+    # A stable UID lets dashboard JSON reference the datasource
+    # without depending on an automatically generated identifier.
+    uid: prometheus
+
+    # Prevent manual deletion from the Grafana UI.
+    editable: false

@@ -1,0 +1,26 @@
+# Grafana dashboard provisioning configuration.
+
+apiVersion: 1
+
+providers:
+  - name: resilient-orders
+
+    # Dashboards will appear inside this Grafana folder.
+    folder: Resilient Orders
+
+    # Stable internal provider identifier.
+    uid: resilient-orders
+
+    # Read dashboard JSON files from the local filesystem.
+    type: file
+
+    # Check periodically whether dashboard files changed.
+    updateIntervalSeconds: 10
+
+    # Dashboards are managed as code.
+    # UI changes should not overwrite the files.
+    allowUiUpdates: false
+
+    options:
+      # This path exists inside the Grafana container.
+      path: /var/lib/grafana/dashboards

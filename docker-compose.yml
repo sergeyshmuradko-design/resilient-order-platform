@@ -118,6 +118,32 @@ services:
       - notification-service
       - payment-service
 
+  grafana:
+    # Grafana visualizes Prometheus metrics and later hosts alerts.
+    image: grafana/grafana
+    container_name: resilient-orders-grafana
+    ports:
+      # Grafana web UI.
+      - "3000:3000"
+    environment:
+      # Local-development credentials only.
+      # Later credentials will move to Kubernetes Secrets.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Disable anonymous access.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      # Persist Grafana's SQLite database and local state.
+      - grafana_data:/var/lib/grafana
+      # Provision the Prometheus datasource from source-controlled YAML.
+      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      # Provision dashboard providers.
+      - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # Source-controlled dashboard JSON files.
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
   payment-service:
     build:
       context: ./services/payment-service
@@ -157,11 +183,11 @@ services:
       #
       # HeapDumpPath:
       # задаёт путь к файлу внутри контейнера.
-      JAVA_TOOL_OPTIONS: >-
-        -Xms256m
-        -Xmx256m
-        -XX:+HeapDumpOnOutOfMemoryError
-        -XX:HeapDumpPath=/diagnostics/order-service-oom.hprof
+      # JAVA_TOOL_OPTIONS: >-
+      #   -Xms256m
+      #   -Xmx256m
+      #   -XX:+HeapDumpOnOutOfMemoryError
+      #   -XX:HeapDumpPath=/diagnostics/order-service-oom.hprof
       SPRING_PROFILES_ACTIVE: load-test
       SERVER_PORT: 8081
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orders_db
@@ -173,10 +199,10 @@ services:
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       SERVICES_PAYMENT_BASE_URL: http://payment-service:8082
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
-    volumes:
-      # Heap dump пишется сразу в каталог проекта на host.
-      # Volume должен быть writable, поэтому :ro здесь не используется.
-      - ./infra/heap-dumps:/diagnostics
+    # volumes:
+    #   # Heap dump пишется сразу в каталог проекта на host.
+    #   # Volume должен быть writable, поэтому :ro здесь не используется.
+    #   - ./infra/heap-dumps:/diagnostics
     depends_on:
       postgres:
         condition: service_healthy
@@ -229,7 +255,8 @@ services:
       jaeger:
         condition: service_started
 
-  graylog-mongodb: # хранит настройки Graylog: users, dashboards, inputs, streams
+  # хранит настройки Graylog: users, dashboards, inputs, streams
+  graylog-mongodb:
     image: mongo:7
     container_name: resilient-orders-graylog-mongodb
     restart: unless-stopped
@@ -237,7 +264,8 @@ services:
     volumes:
       - graylog_mongodb_data:/data/db
 
-  graylog-opensearch: # хранит сами логи и делает поиск по ним
+  # хранит сами логи и делает поиск по ним
+  graylog-opensearch:
     image: opensearchproject/opensearch:2.15.0
     container_name: resilient-orders-graylog-opensearch
     restart: unless-stopped
@@ -293,13 +321,10 @@ services:
     volumes:
       # Основная конфигурация Fluent Bit.
       - ./infra/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
-
       # Custom parser for Spring Boot JSON logs.
       - ./infra/fluent-bit/custom-parsers.conf:/fluent-bit/etc/custom-parsers.conf:ro
-
       # Docker-файлы stdout/stderr всех контейнеров.
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-
       # Каталог для тестового результата.
       # Fluent Bit пишет сюда уже собранные записи.
       - ./infra/fluent-bit/output:/fluent-bit/collected
@@ -310,5 +335,6 @@ volumes:
   rabbitmq_data:
   kafka_data:
   prometheus_data:
+  grafana_data:
   graylog_mongodb_data:
   graylog_opensearch_data:
