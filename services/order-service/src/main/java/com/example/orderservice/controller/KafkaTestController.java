@@ -3,6 +3,7 @@ package com.example.orderservice.controller;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,6 +15,7 @@ import com.example.orderservice.service.kafka.KafkaRawTestPublisher;
 
 import org.springframework.web.bind.annotation.PostMapping;
 
+@Profile("kafka")
 @RestController
 @RequestMapping("/kafka")
 public class KafkaTestController {

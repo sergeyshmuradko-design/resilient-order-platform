@@ -1,0 +1,28 @@
+plugins {
+    /*
+     * Adds Gatling source sets and Gradle tasks
+     * for compiling and running simulations.
+     */
+    id 'io.gatling.gradle' version '3.15.1.1'
+}
+
+java {
+    /*
+     * Performance tests use the same Java version
+     * as the application services.
+     */
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+gatling {
+    jvmArgs = [
+        '-Xmx256m',
+        '--add-opens=java.base/java.lang=ALL-UNNAMED'
+    ]
+}

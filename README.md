@@ -1,5 +1,33 @@
 # resilient-order-platform
 
+## Table of Contents
+
+- [Start Service](#start-service)
+- [Clean Environment](#clean-environment)
+- [Docker Managing](#docker-managing)
+- [Graylog Managing](#graylog-managing)
+- [Kafka Managing](#kafka-managing)
+- [Git Managing](#git-managing)
+- [Linux Managing](#linux-managing)
+- [Swagger](#swagger)
+- [Curl Examples](#curl-examples)
+- [Redis Managing](#redis-managing)
+- [Check Rate Limiter](#check-rate-limiter)
+- [Test RabbitMQ](#test-rabbitmq)
+- [Test Transactional Outbox](#test-transactional-outbox)
+- [Test Kafka Event](#test-kafka-event)
+- [Check Jaeger](#check-jaeger)
+- [Check Prometheus](#check-prometheus)
+- [Prometheus Metrics](#prometheus-metrics)
+
+## Related Documentation
+
+- [Order Service](services/order-service/README.md)
+- [Payment Service](services/payment-service/README.md)
+- [Notification Service](services/notification-service/README.md)
+- [Performance Tests](performance-tests/README.md)
+- [Eclipse Memory Analyzer](infra/mat/README.md)
+
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build
 ./gradlew :services:notification-service:build :services:order-service:build :services:payment-service:build --refresh-dependencies
@@ -16,10 +44,19 @@ docker build -t resilient-orders/notification-service:local services/notificatio
 docker build -t resilient-orders/payment-service:local services/payment-service
 sudo chmod 666 order-service-oom.hprof
 
+## clean environment
+
+./gradlew --stop
+docker-compose stop
+docker builder prune (удалит build cache)
+docker volume inspect resilient-order-platform_kafka_data
+docker volume rm resilient-order-platform_kafka_data
+
 ## docker managing
 
 docker system df -v (Общий Docker usage)
 df -h (Посмотреть память/место)
+free -h
 docker volume ls (Только список volume’ов)
 docker run --rm -v resilient-order-platform_kafka_data:/data busybox du -sh /data (Посмотреть размер конкретного volume через du)
 docker run --rm -v resilient-order-platform_kafka_data:/data busybox ls -lah /data (Посмотреть содержимое)

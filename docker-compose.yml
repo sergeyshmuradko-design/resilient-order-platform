@@ -115,8 +115,8 @@ services:
       - prometheus_data:/prometheus # Сохраняем историю метрик между пересозданиями контейнера.
     depends_on:
       - order-service
-      - notification-service
-      - payment-service
+      # - notification-service
+      # - payment-service
 
   grafana:
     # Grafana visualizes Prometheus metrics and later hosts alerts.
@@ -206,18 +206,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      payment-service:
-        condition: service_healthy
-      schema-registry:
-        condition: service_started
-      jaeger:
-        condition: service_started
+      # redis:
+      #   condition: service_healthy
+      # rabbitmq:
+      #   condition: service_healthy
+      # kafka:
+      #   condition: service_healthy
+      # payment-service:
+      #   condition: service_healthy
+      # schema-registry:
+      #   condition: service_started
+      # jaeger:
+      #   condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health >/dev/null || exit 1"]
       interval: 20s

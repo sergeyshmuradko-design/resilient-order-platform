@@ -2,12 +2,18 @@ package com.example.orderservice.service.kafka;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import com.example.orderservice.dto.OrderCreatedMessage;
 
 @Service
+@ConditionalOnProperty(
+    name = "app.messaging.kafka.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
 public class KafkaOrderEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaOrderEventPublisher.class);

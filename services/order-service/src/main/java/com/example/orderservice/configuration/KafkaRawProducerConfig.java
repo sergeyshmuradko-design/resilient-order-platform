@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +18,11 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import com.example.orderservice.dto.OrderCreatedMessage;
 
 @Configuration
+@ConditionalOnProperty(
+    name = "app.messaging.kafka.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
 public class KafkaRawProducerConfig {
 
     @Bean

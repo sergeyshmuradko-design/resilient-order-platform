@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+
+    <!--
+        Gatling framework logs.
+
+        WARN keeps normal performance runs compact:
+        only warnings and errors are printed.
+    -->
+    <logger name="io.gatling" level="WARN"/>
+
+    <!--
+        Netty is used by Gatling's HTTP client.
+        Detailed Netty logs are normally unnecessary
+        and can significantly increase console output.
+    -->
+    <logger name="io.netty" level="WARN"/>
+
+    <!--
+        To diagnose failed HTTP requests, temporarily change this to DEBUG.
+
+        To log every HTTP request and response, use TRACE.
+        TRACE must not be enabled during real load tests because
+        logging itself distorts performance measurements.
+    -->
+    <logger
+        name="io.gatling.http.engine.response"
+        level="WARN"
+    />
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <appender
+        name="CONSOLE"
+        class="ch.qos.logback.core.ConsoleAppender"
+    >
+        <encoder>
+            <pattern>
+                %d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+</configuration>

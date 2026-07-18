@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import com.example.orderservice.configuration.RabbitMqConfig;
@@ -11,6 +12,11 @@ import com.example.orderservice.dto.OrderCreatedMessage;
 import com.example.orderservice.service.OutboxEventService;
 
 @Service
+@ConditionalOnProperty(
+    name = "app.messaging.rabbit.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
 public class OrderEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(OrderEventPublisher.class);

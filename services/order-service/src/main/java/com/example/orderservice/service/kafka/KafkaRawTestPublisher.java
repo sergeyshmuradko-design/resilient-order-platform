@@ -1,10 +1,16 @@
 package com.example.orderservice.service.kafka;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnProperty(
+    name = "app.messaging.kafka.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
 public class KafkaRawTestPublisher {
 
     private static final String ORDER_CREATED_TOPIC = "order.created.events";

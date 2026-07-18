@@ -2,17 +2,23 @@ package com.example.orderservice.service;
 
 import java.time.Duration;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.example.orderservice.exception.RateLimitExceededException;
 
 @Service
-public class RateLimiterService {
+@ConditionalOnProperty(
+    name = "app.rate-limit.type",
+    havingValue = "redis",
+    matchIfMissing = true
+)
+public class RedisRateLimiterService implements RateLimiter {
 
     private final StringRedisTemplate redisTemplate;
 
-    public RateLimiterService(StringRedisTemplate redisTemplate) {
+    public RedisRateLimiterService(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 

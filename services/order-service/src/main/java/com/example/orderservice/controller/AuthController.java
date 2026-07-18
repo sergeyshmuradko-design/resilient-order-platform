@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.orderservice.dto.LoginRequest;
 import com.example.orderservice.dto.TokenResponse;
-import com.example.orderservice.service.RateLimiterService;
+import com.example.orderservice.service.RateLimiter;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,13 +31,13 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
-    private final RateLimiterService rateLimiterService;
+    private final RateLimiter rateLimiterService;
 
     public AuthController(
         UserDetailsService userDetailsService,
         PasswordEncoder passwordEncoder,
         JwtEncoder jwtEncoder,
-        RateLimiterService rateLimiterService
+        RateLimiter rateLimiterService
     ) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;

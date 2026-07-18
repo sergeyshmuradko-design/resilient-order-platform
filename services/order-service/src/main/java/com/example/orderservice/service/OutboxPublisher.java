@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,11 @@ import com.example.orderservice.service.rabbitmq.OrderEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
+@ConditionalOnProperty(
+    name = "app.outbox.publisher.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
 public class OutboxPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
