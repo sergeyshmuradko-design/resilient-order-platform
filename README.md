@@ -27,6 +27,7 @@
 - [Notification Service](services/notification-service/README.md)
 - [Performance Tests](performance-tests/README.md)
 - [Eclipse Memory Analyzer](infra/mat/README.md)
+- [Grafana Dashboards and Provisioning](infra/grafana/README.md)
 
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build

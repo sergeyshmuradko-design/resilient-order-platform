@@ -4,19 +4,37 @@ services:
     container_name: resilient-orders-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: orders_db
-      POSTGRES_USER: orders_user
-      POSTGRES_PASSWORD: orders_pass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U orders_user -d orders_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.1
+    container_name: postgres-exporter
+    restart: unless-stopped
+    command:
+      - "--collector.database_wraparound"
+      - "--collector.long_running_transactions"
+      - "--collector.stat_activity_autovacuum"
+      - "--collector.statio_user_indexes"
+    environment:
+      DATA_SOURCE_NAME: >-
+        postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   redis:
     image: redis:7
@@ -114,6 +132,7 @@ services:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro # Конфигурация targets и scrape interval.
       - prometheus_data:/prometheus # Сохраняем историю метрик между пересозданиями контейнера.
     depends_on:
+      - postgres-exporter
       - order-service
       # - notification-service
       # - payment-service

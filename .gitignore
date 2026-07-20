@@ -12,3 +12,4 @@ infra/fluent-bit/output/
 infra/heap-dumps/
 infra/heap-reports/
 *.hprof
+.env

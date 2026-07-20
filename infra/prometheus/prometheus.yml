@@ -10,6 +10,15 @@ global:
 scrape_configs:
   # Название группы targets.
   # Оно появится как label job="order-service".
+  - job_name: "postgresql"
+
+    static_configs:
+      - targets:
+          # Prometheus работает внутри Docker network,
+          # поэтому обращается по compose service name,
+          # а не через localhost.
+          - "postgres-exporter:9187"
+
   - job_name: "order-service"
 
     # Spring Boot Prometheus endpoint.
