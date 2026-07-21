@@ -25,14 +25,6 @@ public class OutboxScheduler {
         this.outboxPublisher = outboxPublisher;
     }
 
-    // CREATE TABLE IF NOT EXISTS shedlock (
-    //     name VARCHAR(64) NOT NULL,
-    //     lock_until TIMESTAMP(3) NOT NULL,
-    //     locked_at TIMESTAMP(3) NOT NULL,
-    //     locked_by VARCHAR(255) NOT NULL,
-    //     PRIMARY KEY (name)
-    // );
-
     @Scheduled(fixedDelayString = "${app.outbox.publisher.fixed-delay-ms:5000}")
     @SchedulerLock(
         name = "outboxPublisher",

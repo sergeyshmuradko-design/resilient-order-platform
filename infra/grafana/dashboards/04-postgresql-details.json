@@ -1,31 +1,134 @@
 {
   "annotations": {
+    "list": []
+  },
+  "description": "PostgreSQL 16 details dashboard for Resilient Orders. RU/EN panel descriptions and explicit idle-state handling.",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": [
+    "postgresql",
+    "prometheus",
+    "resilient-orders",
+    "bilingual"
+  ],
+  "templating": {
     "list": [
       {
-        "builtIn": 1,
+        "name": "instance",
+        "label": "Instance / Экземпляр",
+        "type": "query",
         "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
+          "type": "prometheus",
+          "uid": "prometheus"
         },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "query": {
+          "query": "label_values(pg_up{job=\"postgresql\"}, instance)",
+          "refId": "var-instance"
+        },
+        "definition": "label_values(pg_up{job=\"postgresql\"}, instance)",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "description": "RU: Экземпляр postgres_exporter. EN: postgres_exporter instance."
+      },
+      {
+        "name": "database",
+        "label": "Database / База",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(pg_database_size_bytes{instance=~\"$instance\",datname!~\"postgres|template0|template1\"}, datname)",
+          "refId": "var-db"
+        },
+        "definition": "label_values(pg_database_size_bytes{instance=~\"$instance\",datname!~\"postgres|template0|template1\"}, datname)",
+        "current": {
+          "selected": false,
+          "text": "orders_db",
+          "value": "orders_db"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "description": "RU: Прикладная база данных; системные базы скрыты. EN: Application database; system databases are hidden."
+      },
+      {
+        "name": "db_user",
+        "label": "DB User / Пользователь БД",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(pg_stat_statements_calls_total{instance=~\"$instance\",datname=~\"$database\"}, user)",
+          "refId": "var-db-user"
+        },
+        "definition": "label_values(pg_stat_statements_calls_total{instance=~\"$instance\",datname=~\"$database\"}, user)",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "description": "RU: DB user из pg_stat_statements. По умолчанию все пользователи, но top panels исключают postgres_exporter как технический шум. EN: DB user from pg_stat_statements."
+      },
+      {
+        "name": "schema",
+        "label": "Schema / Схема",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(pg_stat_user_tables_n_live_tup{instance=~\"$instance\"}, schemaname)",
+          "refId": "var-schema"
+        },
+        "definition": "label_values(pg_stat_user_tables_n_live_tup{instance=~\"$instance\"}, schemaname)",
+        "current": {
+          "selected": false,
+          "text": "order_service",
+          "value": "order_service"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1
       }
     ]
   },
-  "description": "PostgreSQL 16 details for Resilient Orders.",
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "id": null,
-  "links": [],
-  "liveNow": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Resilient Orders — PostgreSQL Details",
+  "uid": "resilient-orders-postgresql-details",
+  "version": 2,
   "panels": [
     {
       "id": 1,
-      "title": "Overview",
+      "title": "Exporter and Collector Health / Exporter и collectors",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -44,7 +147,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Prometheus can scrape postgres_exporter.",
+      "description": "RU: 1 — Prometheus получает /metrics; 0 — exporter недоступен. EN: 1 means Prometheus scrapes /metrics; 0 means the exporter is unreachable.",
       "gridPos": {
         "x": 0,
         "y": 1,
@@ -58,7 +161,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(up{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "max(up{job=\"postgresql\",instance=~\"$instance\"}) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -68,6 +171,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -108,7 +212,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "0 is healthy; 1 means collection error.",
+      "description": "RU: Норма 0. Значение 1 требует проверки логов exporter. EN: Healthy value is 0. A value of 1 requires checking exporter logs.",
       "gridPos": {
         "x": 4,
         "y": 1,
@@ -122,7 +226,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(pg_exporter_last_scrape_error{instance=~\"$instance\"})",
+          "expr": "max(pg_exporter_last_scrape_error{instance=~\"$instance\"}) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -132,6 +236,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -172,11 +277,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Transactions exceeding the collector threshold.",
+      "description": "RU: Ноль означает, что collector работает и долгих транзакций нет. EN: Zero means the collector works and no long transaction exists.",
       "gridPos": {
         "x": 8,
         "y": 1,
-        "w": 4,
+        "w": 5,
         "h": 4
       },
       "targets": [
@@ -186,7 +291,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(pg_long_running_transactions{instance=~\"$instance\"})",
+          "expr": "max(pg_long_running_transactions{instance=~\"$instance\"}) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -196,6 +301,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -240,11 +346,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Transaction-ID age. The exporter metric suffix is misleading: this is not wall-clock seconds.",
+      "description": "RU: Возраст XID, а не секунды. Сравнивайте с autovacuum_freeze_max_age. EN: XID age, not elapsed seconds. Compare with autovacuum_freeze_max_age.",
       "gridPos": {
-        "x": 12,
+        "x": 13,
         "y": 1,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "targets": [
@@ -254,7 +360,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(pg_database_wraparound_age_datfrozenxid_seconds{instance=~\"$instance\",datname=~\"$database\"})",
+          "expr": "max(pg_database_wraparound_age_datfrozenxid_seconds{instance=~\"$instance\",datname=~\"$database\"}) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -264,6 +370,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -271,6 +378,14 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100000000
+              },
+              {
+                "color": "red",
+                "value": 160000000
               }
             ]
           }
@@ -300,7 +415,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Current database size.",
+      "description": "RU: Размер выбранной базы. EN: Size of the selected database.",
       "gridPos": {
         "x": 18,
         "y": 1,
@@ -314,7 +429,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(pg_database_size_bytes{instance=~\"$instance\",datname=~\"$database\"})",
+          "expr": "max(pg_database_size_bytes{instance=~\"$instance\",datname=~\"$database\"}) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -324,6 +439,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -354,11 +470,74 @@
     },
     {
       "id": 7,
-      "title": "Table Activity",
-      "type": "row",
+      "title": "Collector Health",
+      "type": "bargauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: 1 — collector успешно отработал; 0 — ошибка. EN: 1 means success; 0 means collector failure.",
       "gridPos": {
         "x": 0,
         "y": 5,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "pg_scrape_collector_success{instance=~\"$instance\"}",
+          "legendFormat": "{{collector}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 8,
+      "title": "Table Activity / Активность таблиц",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 11,
         "w": 24,
         "h": 1
       },
@@ -366,18 +545,18 @@
       "panels": []
     },
     {
-      "id": 8,
-      "title": "Live Tuples by Table",
+      "id": 9,
+      "title": "Live Tuples",
       "type": "bargauge",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Estimated live rows per table.",
+      "description": "RU: Оценка живых строк; не точный COUNT(*). EN: Estimated live rows; not an exact COUNT(*).",
       "gridPos": {
         "x": 0,
-        "y": 6,
-        "w": 8,
+        "y": 12,
+        "w": 12,
         "h": 7
       },
       "targets": [
@@ -397,6 +576,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -424,18 +604,18 @@
       }
     },
     {
-      "id": 9,
-      "title": "Dead Tuples by Table",
+      "id": 10,
+      "title": "Dead Tuples",
       "type": "bargauge",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Dead tuples waiting for VACUUM.",
+      "description": "RU: Мёртвые версии строк, ожидающие VACUUM. EN: Dead row versions waiting for VACUUM.",
       "gridPos": {
-        "x": 8,
-        "y": 6,
-        "w": 8,
+        "x": 12,
+        "y": 12,
+        "w": 12,
         "h": 7
       },
       "targets": [
@@ -455,6 +635,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -490,99 +671,18 @@
       }
     },
     {
-      "id": 10,
+      "id": 11,
       "title": "Tuple Changes",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "INSERT, UPDATE, and DELETE rates.",
-      "gridPos": {
-        "x": 16,
-        "y": 6,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_n_tup_ins_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}} inserts",
-          "refId": "A",
-          "range": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_n_tup_upd_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}} updates",
-          "refId": "B",
-          "range": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_n_tup_del_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}} deletes",
-          "refId": "C",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 11,
-      "title": "Sequential Scans/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Sequential scans by table.",
+      "description": "RU: INSERT/UPDATE/DELETE в секунду. При отсутствии изменений отображается 0. EN: INSERT/UPDATE/DELETE per second. Idle state is shown as 0.",
       "gridPos": {
         "x": 0,
-        "y": 13,
-        "w": 12,
+        "y": 19,
+        "w": 24,
         "h": 7
       },
       "targets": [
@@ -592,15 +692,41 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_seq_scan_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}}",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_n_tup_ins{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
+          "legendFormat": "{{relname}} inserts",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_n_tup_upd{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
+          "legendFormat": "{{relname}} updates",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_n_tup_del{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
+          "legendFormat": "{{relname}} deletes",
+          "refId": "C",
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -631,16 +757,16 @@
     },
     {
       "id": 12,
-      "title": "Index Scans/sec",
+      "title": "Sequential Scans/sec",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Index scans by table.",
+      "description": "RU: Последовательные сканирования. Нормальны для малых таблиц. EN: Sequential scans. Normal for small tables.",
       "gridPos": {
-        "x": 12,
-        "y": 13,
+        "x": 0,
+        "y": 26,
         "w": 12,
         "h": 7
       },
@@ -651,15 +777,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_idx_scan_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_seq_scan{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
           "legendFormat": "{{relname}}",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -690,99 +818,17 @@
     },
     {
       "id": 13,
-      "title": "Index I/O",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 20,
-        "w": 24,
-        "h": 1
-      },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 14,
-      "title": "Index Cache Hit Ratio",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Index accesses served from shared buffers.",
-      "gridPos": {
-        "x": 0,
-        "y": 21,
-        "w": 6,
-        "h": 5
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "100 * (sum(rate(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))) / clamp_min((sum(rate(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))) + (sum(rate(pg_statio_user_indexes_idx_blks_read_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))), 0.000001)",
-          "legendFormat": "",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 95
-              },
-              {
-                "color": "green",
-                "value": 99
-              }
-            ]
-          },
-          "decimals": 2
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 15,
-      "title": "Index Blocks Hit/sec",
+      "title": "Index Scans/sec",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Index blocks served from memory.",
+      "description": "RU: Индексные сканирования по таблицам. EN: Index scans by table.",
       "gridPos": {
-        "x": 6,
-        "y": 21,
-        "w": 9,
+        "x": 12,
+        "y": 26,
+        "w": 12,
         "h": 7
       },
       "targets": [
@@ -792,15 +838,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname,indexrelname) (rate(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}} / {{indexrelname}}",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_idx_scan{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
+          "legendFormat": "{{relname}}",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -830,17 +878,99 @@
       }
     },
     {
+      "id": 14,
+      "title": "Index I/O / Индексный I/O",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 15,
+      "title": "Index Cache Hit Ratio",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Доля index accesses из shared buffers. EN: Share of index accesses served from shared buffers.",
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100*(sum(rate(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])))/clamp_min((sum(rate(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])))+(sum(rate(pg_statio_user_indexes_idx_blks_read_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))),0.000001) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
       "id": 16,
-      "title": "Index Blocks Read/sec",
+      "title": "Index Blocks Hit/sec",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Index blocks read from storage.",
+      "description": "RU: Попадания блоков индекса в shared buffers. EN: Index block hits in shared buffers.",
       "gridPos": {
-        "x": 15,
-        "y": 21,
+        "x": 6,
+        "y": 34,
         "w": 9,
         "h": 7
       },
@@ -851,15 +981,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname,indexrelname) (rate(pg_statio_user_indexes_idx_blks_read_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
+          "expr": "sum by (relname,indexrelname) (rate(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
           "legendFormat": "{{relname}} / {{indexrelname}}",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -890,17 +1022,17 @@
     },
     {
       "id": 17,
-      "title": "Top Indexes by Physical Reads",
-      "type": "bargauge",
+      "title": "Index Blocks Read/sec",
+      "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Physical reads in the selected range.",
+      "description": "RU: Физические чтения блоков индекса. EN: Physical index block reads.",
       "gridPos": {
-        "x": 0,
-        "y": 28,
-        "w": 12,
+        "x": 15,
+        "y": 34,
+        "w": 9,
         "h": 7
       },
       "targets": [
@@ -910,16 +1042,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (relname,indexrelname) (increase(pg_statio_user_indexes_idx_blks_read_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__range])))",
+          "expr": "sum by (relname,indexrelname) (rate(pg_statio_user_indexes_idx_blks_read_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
           "legendFormat": "{{relname}} / {{indexrelname}}",
           "refId": "A",
-          "range": false,
-          "instant": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "ops",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -934,83 +1067,27 @@
         "overrides": []
       },
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": false,
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
           "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
+            "lastNotNull",
+            "max"
+          ]
         },
-        "showUnfilled": true
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     },
     {
       "id": 18,
-      "title": "Top Indexes by Buffer Hits",
-      "type": "bargauge",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Buffer hits in the selected range.",
-      "gridPos": {
-        "x": 12,
-        "y": 28,
-        "w": 12,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "topk(10, sum by (relname,indexrelname) (increase(pg_statio_user_indexes_idx_blks_hit_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__range])))",
-          "legendFormat": "{{relname}} / {{indexrelname}}",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showUnfilled": true
-      }
-    },
-    {
-      "id": 19,
-      "title": "Vacuum and Analyze",
+      "title": "Vacuum and Analyze / Очистка и статистика",
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 41,
         "w": 24,
         "h": 1
       },
@@ -1018,17 +1095,17 @@
       "panels": []
     },
     {
-      "id": 20,
+      "id": 19,
       "title": "Vacuum Operations",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Manual and automatic VACUUM rates.",
+      "description": "RU: Завершённые VACUUM/autovacuum. Ноль может быть нормой. EN: Completed VACUUM/autovacuum operations. Zero can be normal.",
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 42,
         "w": 12,
         "h": 7
       },
@@ -1039,10 +1116,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_vacuum_count_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_vacuum_count{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
           "legendFormat": "{{relname}} manual",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
         },
         {
           "datasource": {
@@ -1050,15 +1128,90 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_autovacuum_count_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_autovacuum_count{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
           "legendFormat": "{{relname}} auto",
           "refId": "B",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Analyze Operations",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Завершённые ANALYZE/autoanalyze. EN: Completed ANALYZE/autoanalyze operations.",
+      "gridPos": {
+        "x": 12,
+        "y": 42,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_analyze_count{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
+          "legendFormat": "{{relname}} manual",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (relname) (rate(pg_stat_user_tables_autoanalyze_count{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval])) or on() vector(0)",
+          "legendFormat": "{{relname}} auto",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1089,17 +1242,152 @@
     },
     {
       "id": 21,
-      "title": "Analyze Operations",
+      "title": "Active Autovacuum Workers",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Активные workers прямо сейчас; 0 обычно нормально. EN: Workers active now; 0 is usually normal.",
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(pg_stat_activity_count{instance=~\"$instance\",datname=~\"$database\",backend_type=~\"autovacuum.*\"}) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 22,
+      "title": "Vacuum in Progress",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: VACUUM, выполняющиеся сейчас; idle отображается как 0. EN: VACUUM operations running now; idle state is 0.",
+      "gridPos": {
+        "x": 12,
+        "y": 49,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "count(pg_stat_progress_vacuum_heap_blks_total) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 23,
+      "title": "WAL / Write-Ahead Log",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 24,
+      "title": "WAL Size",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Manual and automatic ANALYZE rates.",
+      "description": "RU: Текущий размер WAL на диске по стандартной метрике postgres_exporter. EN: Current WAL size on disk from the standard postgres_exporter metric.",
       "gridPos": {
-        "x": 12,
-        "y": 36,
-        "w": 12,
+        "x": 0,
+        "y": 55,
+        "w": 8,
         "h": 7
       },
       "targets": [
@@ -1109,26 +1397,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_analyze_count_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}} manual",
+          "expr": "pg_wal_size_bytes{instance=~\"$instance\"} or on() vector(0)",
+          "legendFormat": "WAL size",
           "refId": "A",
-          "range": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum by (relname) (rate(pg_stat_user_tables_autoanalyze_count_total{instance=~\"$instance\",schemaname=~\"$schema\"}[$__rate_interval]))",
-          "legendFormat": "{{relname}} auto",
-          "refId": "B",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops",
+          "unit": "bytes",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1158,218 +1437,18 @@
       }
     },
     {
-      "id": 22,
-      "title": "Dead Tuple Ratio",
-      "type": "bargauge",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Dead tuples as percent of all tuples.",
-      "gridPos": {
-        "x": 0,
-        "y": 43,
-        "w": 12,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "100 * pg_stat_user_tables_n_dead_tup{instance=~\"$instance\",schemaname=~\"$schema\"} / clamp_min(pg_stat_user_tables_n_live_tup{instance=~\"$instance\",schemaname=~\"$schema\"} + pg_stat_user_tables_n_dead_tup{instance=~\"$instance\",schemaname=~\"$schema\"}, 1)",
-          "legendFormat": "{{relname}}",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "red",
-                "value": 20
-              }
-            ]
-          },
-          "decimals": 2
-        },
-        "overrides": []
-      },
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showUnfilled": true
-      }
-    },
-    {
-      "id": 23,
-      "title": "Active Autovacuum Workers",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "May show no data when no worker is active.",
-      "gridPos": {
-        "x": 12,
-        "y": 43,
-        "w": 6,
-        "h": 5
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum(pg_stat_activity_autovacuum_count{instance=~\"$instance\"})",
-          "legendFormat": "",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      }
-    },
-    {
-      "id": 24,
-      "title": "Vacuum in Progress",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "May show no data when no VACUUM is running.",
-      "gridPos": {
-        "x": 18,
-        "y": 43,
-        "w": 6,
-        "h": 5
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "count(pg_stat_progress_vacuum_heap_blks_total{instance=~\"$instance\"})",
-          "legendFormat": "",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      }
-    },
-    {
       "id": 25,
-      "title": "Background Writer and Checkpoints (PostgreSQL 16)",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 50,
-        "w": 24,
-        "h": 1
-      },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 26,
-      "title": "Buffers Allocated/sec",
+      "title": "WAL Segments",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "RU: Количество WAL-сегментов по стандартной метрике postgres_exporter. EN: Number of WAL segments from the standard postgres_exporter metric.",
       "gridPos": {
-        "x": 0,
-        "y": 51,
-        "w": 6,
+        "x": 8,
+        "y": 55,
+        "w": 8,
         "h": 7
       },
       "targets": [
@@ -1379,15 +1458,78 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_buffers_alloc_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "Buffers Allocated/sec",
+          "expr": "pg_wal_segments{instance=~\"$instance\"} or on() vector(0)",
+          "legendFormat": "segments",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "title": "WAL Size Change/sec",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Изменение текущего размера WAL в секунду. Это не raw WAL generation counter, потому что postgres_exporter не отдаёт pg_stat_wal_bytes_total как built-in метрику. EN: Change of current WAL size per second; this is not a raw WAL generation counter.",
+      "gridPos": {
+        "x": 16,
+        "y": 55,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "deriv(pg_wal_size_bytes{instance=~\"$instance\"}[$__rate_interval]) or on() vector(0)",
+          "legendFormat": "size change",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1418,76 +1560,30 @@
     },
     {
       "id": 27,
-      "title": "Buffers Cleaned/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
+      "title": "Locks / Блокировки",
+      "type": "row",
       "gridPos": {
-        "x": 6,
-        "y": 51,
-        "w": 6,
-        "h": 7
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 1
       },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_buffers_clean_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "Buffers Cleaned/sec",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
+      "collapsed": false,
+      "panels": []
     },
     {
       "id": 28,
-      "title": "Backend Writes/sec",
+      "title": "Locks by Mode",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "RU: Locks по режимам. Exporter не даёт granted, поэтому ожидание отдельно не определяется. EN: Locks by mode. The exporter lacks granted, so waiting locks cannot be separated.",
       "gridPos": {
-        "x": 12,
-        "y": 51,
-        "w": 6,
+        "x": 0,
+        "y": 63,
+        "w": 16,
         "h": 7
       },
       "targets": [
@@ -1497,15 +1593,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_buffers_backend_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "Backend Writes/sec",
+          "expr": "sum by (mode) (pg_locks_count{instance=~\"$instance\",datname=~\"$database\"}) or on() vector(0)",
+          "legendFormat": "{{mode}}",
           "refId": "A",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops",
+          "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1536,526 +1634,17 @@
     },
     {
       "id": 29,
-      "title": "Backend fsync/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 18,
-        "y": 51,
-        "w": 6,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_buffers_backend_fsync_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "Backend fsync/sec",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 30,
-      "title": "Checkpoint Buffers/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 0,
-        "y": 58,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_buffers_checkpoint_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "checkpoint",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 31,
-      "title": "Maxwritten Clean/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 8,
-        "y": 58,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_maxwritten_clean_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "maxwritten",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 32,
-      "title": "Checkpoint Activity",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "PostgreSQL 16 checkpoint counters from pg_stat_bgwriter.",
-      "gridPos": {
-        "x": 16,
-        "y": 58,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_checkpoints_timed_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "timed",
-          "refId": "A",
-          "range": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_bgwriter_checkpoints_req_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "requested",
-          "refId": "B",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 33,
-      "title": "WAL",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 65,
-        "w": 24,
-        "h": 1
-      },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 34,
-      "title": "WAL Records/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 0,
-        "y": 66,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_wal_wal_records_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "records",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 35,
-      "title": "WAL Full-page Images/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 8,
-        "y": 66,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_wal_wal_fpi_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "FPI",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 36,
-      "title": "WAL Bytes/sec",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "gridPos": {
-        "x": 16,
-        "y": 66,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(pg_stat_wal_wal_bytes_total{instance=~\"$instance\"}[$__rate_interval])",
-          "legendFormat": "bytes",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 37,
-      "title": "Locks",
-      "type": "row",
-      "gridPos": {
-        "x": 0,
-        "y": 73,
-        "w": 24,
-        "h": 1
-      },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "id": 38,
-      "title": "Locks by Mode",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Current locks by mode.",
-      "gridPos": {
-        "x": 0,
-        "y": 74,
-        "w": 12,
-        "h": 7
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum by (mode) (pg_locks_count{instance=~\"$instance\",datname=~\"$database\"})",
-          "legendFormat": "{{mode}}",
-          "refId": "A",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 39,
-      "title": "Waiting Locks",
+      "title": "Access Exclusive Locks",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "May show no data if the exporter build has no granted label.",
+      "description": "RU: Наиболее конфликтный lock mode, часто связан с DDL. EN: Most conflicting lock mode, often associated with DDL.",
       "gridPos": {
-        "x": 12,
-        "y": 74,
-        "w": 6,
+        "x": 16,
+        "y": 63,
+        "w": 8,
         "h": 5
       },
       "targets": [
@@ -2065,7 +1654,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(pg_locks_count{instance=~\"$instance\",datname=~\"$database\",granted=\"false\"})",
+          "expr": "sum(pg_locks_count{instance=~\"$instance\",datname=~\"$database\",mode=\"accessexclusivelock\"}) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -2075,6 +1664,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -2089,7 +1679,7 @@
               },
               {
                 "color": "red",
-                "value": 5
+                "value": 3
               }
             ]
           }
@@ -2112,19 +1702,32 @@
       }
     },
     {
-      "id": 40,
-      "title": "Exclusive Locks",
-      "type": "stat",
+      "id": 30,
+      "title": "Top SQL Queries / Тяжёлые SQL-запросы",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 71,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 31,
+      "title": "Top SQL by Total Time",
+      "type": "table",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "RU: Запросы, которые суммарно потребили больше всего времени за выбранный диапазон. Значения cumulative с момента последнего reset pg_stat_statements/Postgres. EN: Cumulative since the last pg_stat_statements/Postgres reset.",
       "gridPos": {
-        "x": 18,
-        "y": 74,
-        "w": 6,
-        "h": 5
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
       },
       "targets": [
         {
@@ -2133,16 +1736,18 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(pg_locks_count{instance=~\"$instance\",datname=~\"$database\",mode=~\".*ExclusiveLock\"})",
-          "legendFormat": "",
+          "expr": "topk(10, sum by (queryid,user) (pg_stat_statements_seconds_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}) * on(queryid) group_left(query) pg_stat_statements_query_id)",
+          "legendFormat": "{{query}}",
           "refId": "A",
           "range": false,
-          "instant": true
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "s",
+          "noValue": "0",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -2154,143 +1759,542 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
       },
       "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
           ],
+          "countRows": false,
           "fields": ""
+        }
+      }
+    },
+    {
+      "id": 32,
+      "title": "Top SQL by Mean Time",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Среднее время одного выполнения. Хорошо показывает медленные одиночные запросы. Значения cumulative с момента последнего reset pg_stat_statements/Postgres. EN: Cumulative since the last pg_stat_statements/Postgres reset.",
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10, (sum by (queryid,user) (pg_stat_statements_seconds_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}) / clamp_min(sum by (queryid,user) (pg_stat_statements_calls_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}), 1)) * on(queryid) group_left(query) pg_stat_statements_query_id)",
+          "legendFormat": "{{query}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 33,
+      "title": "Top SQL by Calls",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Самые часто вызываемые SQL-запросы за выбранный диапазон. Значения cumulative с момента последнего reset pg_stat_statements/Postgres. EN: Cumulative since the last pg_stat_statements/Postgres reset.",
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10, sum by (queryid,user) (pg_stat_statements_calls_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}) * on(queryid) group_left(query) pg_stat_statements_query_id)",
+          "legendFormat": "{{query}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 34,
+      "title": "Top SQL by Rows",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Запросы, вернувшие или изменившие больше всего строк за выбранный диапазон. Значения cumulative с момента последнего reset pg_stat_statements/Postgres. EN: Cumulative since the last pg_stat_statements/Postgres reset.",
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10, sum by (queryid,user) (pg_stat_statements_rows_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}) * on(queryid) group_left(query) pg_stat_statements_query_id)",
+          "legendFormat": "{{query}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rows/s",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 35,
+      "title": "Top SQL by Block Read Time",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Запросы с наибольшим временем чтения блоков за выбранный диапазон. Требует track_io_timing=on. Значения cumulative с момента последнего reset pg_stat_statements/Postgres. EN: Cumulative since the last pg_stat_statements/Postgres reset.",
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10, sum by (queryid,user) (pg_stat_statements_block_read_seconds_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}) * on(queryid) group_left(query) pg_stat_statements_query_id)",
+          "legendFormat": "{{query}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 36,
+      "title": "Top SQL by Block Write Time",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "RU: Запросы с наибольшим временем записи блоков за выбранный диапазон. Требует track_io_timing=on. Значения cumulative с момента последнего reset pg_stat_statements/Postgres. EN: Cumulative since the last pg_stat_statements/Postgres reset.",
+      "gridPos": {
+        "x": 12,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10, sum by (queryid,user) (pg_stat_statements_block_write_seconds_total{instance=~\"$instance\",datname=~\"$database\",user=~\"$db_user\",user!=\"postgres_exporter\"}) * on(queryid) group_left(query) pg_stat_statements_query_id)",
+          "legendFormat": "{{query}}",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
       }
     }
-  ],
-  "refresh": "15s",
-  "schemaVersion": 39,
-  "tags": [
-    "postgresql",
-    "prometheus",
-    "resilient-orders"
-  ],
-  "templating": {
-    "list": [
-      {
-        "name": "job",
-        "label": "Prometheus job",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "query": "label_values(up, job)",
-          "refId": "job"
-        },
-        "definition": "label_values(up, job)",
-        "current": {
-          "selected": false,
-          "text": "postgres",
-          "value": "postgres"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 1,
-        "sort": 1,
-        "hide": 0
-      },
-      {
-        "name": "instance",
-        "label": "Instance",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "query": "label_values(up{job=~\"$job\"}, instance)",
-          "refId": "instance"
-        },
-        "definition": "label_values(up{job=~\"$job\"}, instance)",
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 1,
-        "sort": 1,
-        "hide": 0
-      },
-      {
-        "name": "database",
-        "label": "Database",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "query": "label_values(pg_database_wraparound_age_datfrozenxid_seconds{instance=~\"$instance\"}, datname)",
-          "refId": "database"
-        },
-        "definition": "label_values(pg_database_wraparound_age_datfrozenxid_seconds{instance=~\"$instance\"}, datname)",
-        "current": {
-          "selected": false,
-          "text": "orders_db",
-          "value": "orders_db"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 1,
-        "sort": 1,
-        "hide": 0
-      },
-      {
-        "name": "schema",
-        "label": "Schema",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "query": "label_values(pg_stat_user_tables_n_live_tup{instance=~\"$instance\"}, schemaname)",
-          "refId": "schema"
-        },
-        "definition": "label_values(pg_stat_user_tables_n_live_tup{instance=~\"$instance\"}, schemaname)",
-        "current": {
-          "selected": false,
-          "text": "public",
-          "value": "public"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 1,
-        "sort": 1,
-        "hide": 0
-      }
-    ]
-  },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "browser",
-  "title": "Resilient Orders — PostgreSQL Details",
-  "uid": "postgresql-details",
-  "version": 1,
-  "weekStart": ""
+  ]
 }

@@ -40,15 +40,29 @@ spring:
         spring.json.value.default.type: com.example.notificationservice.dto.OrderCreatedMessage
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}?currentSchema=notification_service
+    username: ${NOTIFICATION_SERVICE_DB_USER}
+    password: ${NOTIFICATION_SERVICE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     open-in-view: false # Когда включено соединение держится принудительно на все время http запроса
+    properties:
+      hibernate:
+        # Hibernate только валидирует модель против schema notification_service.
+        # DDL управляется Flyway-миграциями.
+        default_schema: notification_service
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Единственная schema в списке становится default schema Flyway.
+    # Поэтому migration SQL не нужно засорять префиксом notification_service.
+    schemas: notification_service
+    user: ${NOTIFICATION_SERVICE_DB_OWNER_USER}
+    password: ${NOTIFICATION_SERVICE_DB_OWNER_PASSWORD}
 
   rabbitmq:
     host: localhost
