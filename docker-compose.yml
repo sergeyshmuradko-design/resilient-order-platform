@@ -84,8 +84,8 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -157,9 +157,6 @@ services:
       - prometheus_data:/prometheus # Сохраняем историю метрик между пересозданиями контейнера.
     depends_on:
       - postgres-exporter
-      - order-service
-      # - notification-service
-      # - payment-service
 
   grafana:
     # Grafana visualizes Prometheus metrics and later hosts alerts.
@@ -171,8 +168,8 @@ services:
     environment:
       # Local-development credentials only.
       # Later credentials will move to Kubernetes Secrets.
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Set GRAFANA_ADMIN_USER in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
       # Disable anonymous access.
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
@@ -231,8 +228,13 @@ services:
       #   -Xmx256m
       #   -XX:+HeapDumpOnOutOfMemoryError
       #   -XX:HeapDumpPath=/diagnostics/order-service-oom.hprof
-      SPRING_PROFILES_ACTIVE: load-test
+      SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8081
+      SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ORDER_SERVICE_ADMIN_USERNAME: ${ORDER_SERVICE_ADMIN_USERNAME:?Set ORDER_SERVICE_ADMIN_USERNAME in .env}
+      ORDER_SERVICE_ADMIN_PASSWORD: ${ORDER_SERVICE_ADMIN_PASSWORD:?Set ORDER_SERVICE_ADMIN_PASSWORD in .env}
+      ORDER_SERVICE_USER_USERNAME: ${ORDER_SERVICE_USER_USERNAME:?Set ORDER_SERVICE_USER_USERNAME in .env}
+      ORDER_SERVICE_USER_PASSWORD: ${ORDER_SERVICE_USER_PASSWORD:?Set ORDER_SERVICE_USER_PASSWORD in .env}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}?currentSchema=order_service
       SPRING_DATASOURCE_USERNAME: ${ORDER_SERVICE_DB_USER:?Set ORDER_SERVICE_DB_USER in .env}
       SPRING_DATASOURCE_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:?Set ORDER_SERVICE_DB_PASSWORD in .env}
@@ -240,6 +242,8 @@ services:
       SPRING_FLYWAY_PASSWORD: ${ORDER_SERVICE_DB_OWNER_PASSWORD:?Set ORDER_SERVICE_DB_OWNER_PASSWORD in .env}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in .env}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       SERVICES_PAYMENT_BASE_URL: http://payment-service:8082
@@ -251,18 +255,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      # redis:
-      #   condition: service_healthy
-      # rabbitmq:
-      #   condition: service_healthy
-      # kafka:
-      #   condition: service_healthy
-      # payment-service:
-      #   condition: service_healthy
-      # schema-registry:
-      #   condition: service_started
-      # jaeger:
-      #   condition: service_started
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      schema-registry:
+        condition: service_started
+      jaeger:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health >/dev/null || exit 1"]
       interval: 20s
@@ -287,6 +291,8 @@ services:
       SPRING_FLYWAY_USER: ${NOTIFICATION_SERVICE_DB_OWNER_USER:?Set NOTIFICATION_SERVICE_DB_OWNER_USER in .env}
       SPRING_FLYWAY_PASSWORD: ${NOTIFICATION_SERVICE_DB_OWNER_PASSWORD:?Set NOTIFICATION_SERVICE_DB_OWNER_PASSWORD in .env}
       SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in .env}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces

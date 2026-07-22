@@ -11,10 +11,7 @@ spring:
     hikari:
       # Намеренно маленький pool для демонстрации насыщения.
       maximum-pool-size: 2
-
-      # Если оба соединения заняты дольше 3 секунд,
-      # следующий запрос завершится connection timeout.
-      connection-timeout: 3000
+      minimum-idle: 1
 
 app:
   outbox:

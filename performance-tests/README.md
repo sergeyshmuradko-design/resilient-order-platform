@@ -49,9 +49,12 @@ Expected response:
 The simulation requires a JWT token through the `TOKEN` environment variable.
 
 ```bash
+export ORDER_SERVICE_ADMIN_USERNAME="<local-admin-username>"
+export ORDER_SERVICE_ADMIN_PASSWORD="<local-admin-password>"
+
 export TOKEN=$(curl -s -X POST http://localhost:8081/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}' \
+  -d "{\"username\":\"${ORDER_SERVICE_ADMIN_USERNAME}\",\"password\":\"${ORDER_SERVICE_ADMIN_PASSWORD}\"}" \
   | jq -r '.accessToken')
 ```
 

@@ -65,10 +65,10 @@ spring:
     password: ${NOTIFICATION_SERVICE_DB_OWNER_PASSWORD}
 
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
 
     listener:
       simple:

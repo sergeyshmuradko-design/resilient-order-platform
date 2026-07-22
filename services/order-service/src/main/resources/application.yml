@@ -42,7 +42,16 @@ app:
 
 security:
   jwt:
-    secret: "dev-secret-key-dev-secret-key-123456"
+    secret: ${JWT_SECRET}
+  local-users:
+    - username: ${ORDER_SERVICE_ADMIN_USERNAME}
+      password: ${ORDER_SERVICE_ADMIN_PASSWORD}
+      roles:
+        - ADMIN
+    - username: ${ORDER_SERVICE_USER_USERNAME}
+      password: ${ORDER_SERVICE_USER_PASSWORD}
+      roles:
+        - USER
 
 spring:
   application:
@@ -69,10 +78,10 @@ spring:
         enable.idempotence: true # защита от duplicate при retry producer'а
         spring.json.add.type.headers: false
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
     publisher-confirm-type: correlated # RabbitMQ подтвердит, что broker принял message.
     publisher-returns: true # если message не смог попасть ни в одну queue, broker вернёт его producer’у.
     template:
@@ -94,9 +103,9 @@ spring:
 
     hikari:
       pool-name: OrderServiceHikariPool
-      maximum-pool-size: 2 # Максимум 2 соединения к БД одновременно.
-      minimum-idle: 1 # Hikari старается держать хотя бы 1 свободное соединение готовым.
-      connection-timeout: 3000 # Если все 2 соединения заняты, новый request ждёт максимум 3 секунды. Потом ошибка.
+      maximum-pool-size: 10 # Максимум 10 соединений к БД одновременно.
+      minimum-idle: 2 # Hikari старается держать хотя бы 2 свободных соединения готовым.
+      connection-timeout: 3000 # Если все 10 соединений заняты, новый request ждёт максимум 3 секунды. Потом ошибка.
       idle-timeout: 600000 # Свободное соединение может простаивать 10 минут, потом Hikari может его закрыть.
       max-lifetime: 1800000 # Соединение живёт максимум 30 минут, потом пересоздаётся. Это защищает от старых/stale connections.
 

@@ -4,12 +4,13 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +27,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 @Configuration
 @EnableMethodSecurity
+@EnableConfigurationProperties(SecurityUsersProperties.class)
 public class SecurityConfig {
 
     @Bean
@@ -68,18 +70,18 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        return new InMemoryUserDetailsManager(
-            User.withUsername("admin")
-                .password(passwordEncoder.encode("admin123"))
-                .roles("ADMIN")
-                .build(),
+    public UserDetailsService userDetailsService(
+        PasswordEncoder passwordEncoder,
+        SecurityUsersProperties securityUsersProperties
+    ) {
+        UserDetails[] users = securityUsersProperties.localUsers().stream()
+            .map(localUser -> User.withUsername(localUser.username())
+                .password(passwordEncoder.encode(localUser.password()))
+                .roles(localUser.roles().toArray(String[]::new))
+                .build())
+            .toArray(UserDetails[]::new);
 
-            User.withUsername("user")
-                .password(passwordEncoder.encode("user123"))
-                .roles("USER")
-                .build()
-        );
+        return new InMemoryUserDetailsManager(users);
     }
 
     @Bean

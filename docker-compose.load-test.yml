@@ -1,0 +1,12 @@
+# Override для нагрузочного тестирования.
+#
+# Базовый docker-compose.yml остаётся обычным dev-стеком.
+# Этот файл подключается только когда нужно запустить order-service
+# с профилем load-test и уменьшенными настройками из application-load-test.yml.
+services:
+  order-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,load-test
+    depends_on: !override
+      postgres:
+        condition: service_healthy

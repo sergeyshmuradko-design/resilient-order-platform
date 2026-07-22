@@ -13,3 +13,5 @@ infra/heap-dumps/
 infra/heap-reports/
 *.hprof
 .env
+.env.local
+.env.*.local

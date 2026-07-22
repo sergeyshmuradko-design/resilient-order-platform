@@ -12,7 +12,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 @Configuration
 public class OpenApiConfig {
 
-    private static final String BASIC_AUTH = "basicAuth";
+    //private static final String BASIC_AUTH = "basicAuth";
     private static final String BEARER_AUTH = "bearerAuth";
 
     @Bean
