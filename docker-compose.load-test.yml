@@ -10,3 +10,5 @@ services:
     depends_on: !override
       postgres:
         condition: service_healthy
+      vault:
+        condition: service_healthy

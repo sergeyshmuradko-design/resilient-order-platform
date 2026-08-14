@@ -40,19 +40,6 @@ app:
     publisher:
       fixed-delay-ms: 5000
 
-security:
-  jwt:
-    secret: ${JWT_SECRET}
-  local-users:
-    - username: ${ORDER_SERVICE_ADMIN_USERNAME}
-      password: ${ORDER_SERVICE_ADMIN_PASSWORD}
-      roles:
-        - ADMIN
-    - username: ${ORDER_SERVICE_USER_USERNAME}
-      password: ${ORDER_SERVICE_USER_PASSWORD}
-      roles:
-        - USER
-
 spring:
   application:
     name: order-service
@@ -80,8 +67,6 @@ spring:
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME}
-    password: ${RABBITMQ_PASSWORD}
     publisher-confirm-type: correlated # RabbitMQ подтвердит, что broker принял message.
     publisher-returns: true # если message не смог попасть ни в одну queue, broker вернёт его producer’у.
     template:
@@ -98,7 +83,6 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}?currentSchema=order_service
     username: ${ORDER_SERVICE_DB_USER}
-    password: ${ORDER_SERVICE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
     hikari:
@@ -126,7 +110,6 @@ spring:
     # Поэтому в SQL-миграциях можно писать CREATE TABLE orders без префикса order_service.
     schemas: order_service
     user: ${ORDER_SERVICE_DB_OWNER_USER}
-    password: ${ORDER_SERVICE_DB_OWNER_PASSWORD}
 
 services:
   payment:

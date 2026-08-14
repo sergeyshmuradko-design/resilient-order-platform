@@ -1,4 +1,22 @@
 services:
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: resilient-orders-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
   postgres:
     image: postgres:16
     container_name: resilient-orders-postgres
@@ -84,8 +102,8 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in .env}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN_USERNAME:?Set RABBITMQ_ADMIN_USERNAME in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASSWORD:?Set RABBITMQ_ADMIN_PASSWORD in .env}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -228,22 +246,19 @@ services:
       #   -Xmx256m
       #   -XX:+HeapDumpOnOutOfMemoryError
       #   -XX:HeapDumpPath=/diagnostics/order-service-oom.hprof
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: ${ORDER_SERVICE_SPRING_PROFILES_ACTIVE:-docker}
       SERVER_PORT: 8081
-      SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      ORDER_SERVICE_ADMIN_USERNAME: ${ORDER_SERVICE_ADMIN_USERNAME:?Set ORDER_SERVICE_ADMIN_USERNAME in .env}
-      ORDER_SERVICE_ADMIN_PASSWORD: ${ORDER_SERVICE_ADMIN_PASSWORD:?Set ORDER_SERVICE_ADMIN_PASSWORD in .env}
-      ORDER_SERVICE_USER_USERNAME: ${ORDER_SERVICE_USER_USERNAME:?Set ORDER_SERVICE_USER_USERNAME in .env}
-      ORDER_SERVICE_USER_PASSWORD: ${ORDER_SERVICE_USER_PASSWORD:?Set ORDER_SERVICE_USER_PASSWORD in .env}
+      SPRING_CONFIG_IMPORT: vault://
+      SPRING_CLOUD_VAULT_URI: http://vault:8200
+      SPRING_CLOUD_VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+      SPRING_CLOUD_VAULT_KV_ENABLED: "true"
+      SPRING_CLOUD_VAULT_KV_BACKEND: secret
+      SPRING_CLOUD_VAULT_KV_APPLICATION_NAME: resilient-orders/order-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}?currentSchema=order_service
       SPRING_DATASOURCE_USERNAME: ${ORDER_SERVICE_DB_USER:?Set ORDER_SERVICE_DB_USER in .env}
-      SPRING_DATASOURCE_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:?Set ORDER_SERVICE_DB_PASSWORD in .env}
       SPRING_FLYWAY_USER: ${ORDER_SERVICE_DB_OWNER_USER:?Set ORDER_SERVICE_DB_OWNER_USER in .env}
-      SPRING_FLYWAY_PASSWORD: ${ORDER_SERVICE_DB_OWNER_PASSWORD:?Set ORDER_SERVICE_DB_OWNER_PASSWORD in .env}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in .env}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       SERVICES_PAYMENT_BASE_URL: http://payment-service:8082
@@ -254,6 +269,8 @@ services:
     #   - ./infra/heap-dumps:/diagnostics
     depends_on:
       postgres:
+        condition: service_healthy
+      vault:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -285,19 +302,23 @@ services:
       - "8083:8083"
     environment:
       SERVER_PORT: 8083
+      SPRING_CONFIG_IMPORT: vault://
+      SPRING_CLOUD_VAULT_URI: http://vault:8200
+      SPRING_CLOUD_VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+      SPRING_CLOUD_VAULT_KV_ENABLED: "true"
+      SPRING_CLOUD_VAULT_KV_BACKEND: secret
+      SPRING_CLOUD_VAULT_KV_APPLICATION_NAME: resilient-orders/notification-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}?currentSchema=notification_service
       SPRING_DATASOURCE_USERNAME: ${NOTIFICATION_SERVICE_DB_USER:?Set NOTIFICATION_SERVICE_DB_USER in .env}
-      SPRING_DATASOURCE_PASSWORD: ${NOTIFICATION_SERVICE_DB_PASSWORD:?Set NOTIFICATION_SERVICE_DB_PASSWORD in .env}
       SPRING_FLYWAY_USER: ${NOTIFICATION_SERVICE_DB_OWNER_USER:?Set NOTIFICATION_SERVICE_DB_OWNER_USER in .env}
-      SPRING_FLYWAY_PASSWORD: ${NOTIFICATION_SERVICE_DB_OWNER_PASSWORD:?Set NOTIFICATION_SERVICE_DB_OWNER_PASSWORD in .env}
       SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in .env}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
     depends_on:
       postgres:
+        condition: service_healthy
+      vault:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy

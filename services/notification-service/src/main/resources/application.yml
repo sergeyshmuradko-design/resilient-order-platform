@@ -42,7 +42,6 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}?currentSchema=notification_service
     username: ${NOTIFICATION_SERVICE_DB_USER}
-    password: ${NOTIFICATION_SERVICE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -62,13 +61,10 @@ spring:
     # Поэтому migration SQL не нужно засорять префиксом notification_service.
     schemas: notification_service
     user: ${NOTIFICATION_SERVICE_DB_OWNER_USER}
-    password: ${NOTIFICATION_SERVICE_DB_OWNER_PASSWORD}
 
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME}
-    password: ${RABBITMQ_PASSWORD}
 
     listener:
       simple:
