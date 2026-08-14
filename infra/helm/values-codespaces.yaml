@@ -1,0 +1,66 @@
+# Codespaces/tiny local profile.
+#
+# This profile is intentionally conservative. It keeps the whole platform shape
+# available, but reduces background pressure so a free/limited Codespaces VM can
+# start the stack without constant probe-induced restarts.
+
+guardrails:
+  quota:
+    requestsCpu: 1200m
+    requestsMemory: 2304Mi
+    limitsCpu: 4500m
+    limitsMemory: 4608Mi
+  limitRange:
+    maxMemory: 1Gi
+
+components:
+  kafka:
+    heap:
+      xms: 128m
+      xmx: 384m
+    logRetentionMs: "60000"
+    logRetentionBytes: "33554432"
+    logSegmentBytes: "8388608"
+    storage: 512Mi
+    resources:
+      requests:
+        cpu: 75m
+        memory: 384Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
+  schemaRegistry:
+    heapOpts: -Xms64m -Xmx128m
+    resources:
+      requests:
+        cpu: 40m
+        memory: 192Mi
+      limits:
+        cpu: 250m
+        memory: 384Mi
+  orderService:
+    javaToolOptions: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=20
+    resources:
+      requests:
+        cpu: 60m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 640Mi
+
+observability:
+  tracing:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 96Mi
+      limits:
+        cpu: 200m
+        memory: 192Mi
+  monitoring:
+    prometheus:
+      retentionTime: 15m
+      retentionSize: 128MB
+      emptyDirSizeLimit: 128Mi
+    grafana:
+      emptyDirSizeLimit: 96Mi

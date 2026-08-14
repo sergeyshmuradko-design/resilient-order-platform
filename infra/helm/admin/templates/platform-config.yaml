@@ -1,0 +1,14 @@
+# Non-secret platform configuration. Passwords and tokens are intentionally kept
+# in platform-secrets, which can be produced by External Secrets Operator.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+  labels:
+    {{- include "resilient-orders.labels" . | nindent 4 }}
+data:
+  POSTGRES_DB: {{ .Values.config.postgresDb | quote }}
+  POSTGRES_USER: {{ .Values.config.postgresUser | quote }}
+  POSTGRES_EXPORTER_USER: {{ .Values.config.postgresExporterUser | quote }}
+  RABBITMQ_HOST: {{ .Values.config.rabbitmqHost | quote }}
+  RABBITMQ_PORT: {{ .Values.config.rabbitmqPort | quote }}

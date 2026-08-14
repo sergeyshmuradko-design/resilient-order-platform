@@ -1,0 +1,21 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name | quote }}
+  labels:
+    {{- include "resilient-orders.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className | quote }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: {{ .Values.gateway.hostname | quote }}
+      allowedRoutes:
+        namespaces:
+          from: {{ .Values.gateway.allowedRoutes.namespaces.from }}
+          selector:
+            matchLabels:
+              {{ .Values.namespaces.gatewayRoutesLabelKey }}: {{ .Values.namespaces.gatewayRoutesLabelValue | quote }}
+{{- end }}

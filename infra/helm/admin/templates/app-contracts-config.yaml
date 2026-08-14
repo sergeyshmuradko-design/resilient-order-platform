@@ -1,0 +1,18 @@
+# Application-visible database contract.
+#
+# The ConfigMap is created in the application namespace, but owned by the admin
+# chart. App Pods can read approved role names from their own namespace, while
+# developers do not own the privileged role/schema provisioning mechanism.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-contracts-config
+  namespace: {{ .Values.namespaces.application | quote }}
+  labels:
+    {{- include "resilient-orders.labels" . | nindent 4 }}
+data:
+  POSTGRES_DB: {{ .Values.config.postgresDb | quote }}
+  {{- range .Values.database.services }}
+  {{ .ownerRole.configKey }}: {{ .ownerRole.value | quote }}
+  {{ .appRole.configKey }}: {{ .appRole.value | quote }}
+  {{- end }}

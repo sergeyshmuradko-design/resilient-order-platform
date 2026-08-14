@@ -1,0 +1,61 @@
+{{- if .Values.components.kafka.enabled }}
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: {{ .Values.components.kafka.nodePoolName | quote }}
+  labels:
+    strimzi.io/cluster: {{ .Values.components.kafka.clusterName | quote }}
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "kafka" "component" "messaging") | nindent 4 }}
+spec:
+  replicas: {{ .Values.components.kafka.replicas }}
+  roles:
+    # A real highly available production cluster should split controllers and
+    # brokers across multiple nodes. This project keeps one dual-role node to
+    # stay within Codespaces / small VM limits while using the production
+    # operator-managed Kafka model.
+    - controller
+    - broker
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: {{ .Values.components.kafka.storage | quote }}
+        deleteClaim: {{ .Values.components.kafka.deleteClaim }}
+  jvmOptions:
+    -Xms: {{ .Values.components.kafka.heap.xms | quote }}
+    -Xmx: {{ .Values.components.kafka.heap.xmx | quote }}
+  resources:
+    {{- toYaml .Values.components.kafka.resources | nindent 4 }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: {{ .Values.components.kafka.clusterName | quote }}
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "kafka" "component" "messaging") | nindent 4 }}
+spec:
+  kafka:
+    version: {{ .Values.components.kafka.version | quote }}
+    metadataVersion: {{ .Values.components.kafka.metadataVersion | quote }}
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      group.initial.rebalance.delay.ms: 0
+      log.retention.ms: {{ .Values.components.kafka.logRetentionMs | quote }}
+      log.retention.bytes: {{ .Values.components.kafka.logRetentionBytes | quote }}
+      log.segment.bytes: {{ .Values.components.kafka.logSegmentBytes | quote }}
+      auto.create.topics.enable: "false"
+  entityOperator:
+    topicOperator:
+      watchedNamespace: {{ .Values.namespaces.application | quote }}
+    userOperator: {}
+{{- end }}

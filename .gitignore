@@ -6,6 +6,7 @@ out/
 .idea/
 *.impl
 .vscode/
+.local/
 bin/
 **/exports/
 infra/fluent-bit/output/
@@ -15,3 +16,11 @@ infra/heap-reports/
 .env
 .env.local
 .env.*.local
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log

@@ -1,0 +1,8 @@
+# Tracing profile.
+#
+# Jaeger is enabled in values.yaml for now because the current services point to
+# the jaeger Service DNS name. This file exists so the future split can move
+# tracing out of the default profile without changing Makefile commands.
+observability:
+  tracing:
+    enabled: true

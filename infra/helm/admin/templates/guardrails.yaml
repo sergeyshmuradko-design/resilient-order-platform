@@ -1,0 +1,38 @@
+{{- if .Values.guardrails.enabled }}
+# Namespace-level safety rails for constrained local/k3s/k3d/Oracle VM runs.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resilient-orders-quota
+  labels:
+    {{- include "resilient-orders.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.guardrails.quota.requestsCpu | quote }}
+    requests.memory: {{ .Values.guardrails.quota.requestsMemory | quote }}
+    limits.cpu: {{ .Values.guardrails.quota.limitsCpu | quote }}
+    limits.memory: {{ .Values.guardrails.quota.limitsMemory | quote }}
+    requests.storage: {{ .Values.guardrails.quota.requestsStorage | quote }}
+    persistentvolumeclaims: {{ .Values.guardrails.quota.persistentVolumeClaims | quote }}
+    pods: {{ .Values.guardrails.quota.pods | quote }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: resilient-orders-default-limits
+  labels:
+    {{- include "resilient-orders.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: {{ .Values.guardrails.limitRange.defaultRequestCpu | quote }}
+        memory: {{ .Values.guardrails.limitRange.defaultRequestMemory | quote }}
+      default:
+        cpu: {{ .Values.guardrails.limitRange.defaultCpu | quote }}
+        memory: {{ .Values.guardrails.limitRange.defaultMemory | quote }}
+      max:
+        cpu: {{ .Values.guardrails.limitRange.maxCpu | quote }}
+        memory: {{ .Values.guardrails.limitRange.maxMemory | quote }}
+{{- end }}
+

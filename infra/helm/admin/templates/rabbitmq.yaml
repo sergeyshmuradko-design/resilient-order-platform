@@ -1,0 +1,122 @@
+{{- if .Values.components.rabbitmq.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "rabbitmq" "component" "messaging") | nindent 4 }}
+spec:
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: amqp
+    - name: management
+      port: 15672
+      targetPort: management
+  selector:
+    app.kubernetes.io/name: rabbitmq
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "rabbitmq" "component" "messaging") | nindent 4 }}
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+        app.kubernetes.io/component: messaging
+        app.kubernetes.io/part-of: {{ .Values.labels.partOf | quote }}
+    spec:
+      serviceAccountName: platform-workload
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: rabbitmq
+          image: {{ .Values.components.rabbitmq.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.targetName }}
+                  key: RABBITMQ_ADMIN_USERNAME
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.targetName }}
+                  key: RABBITMQ_ADMIN_PASSWORD
+            - name: RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS
+              value: "-rabbit vm_memory_high_watermark 0.4 disk_free_limit {{ .Values.components.rabbitmq.diskFreeLimitBytes }}"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+            - name: config
+              mountPath: /etc/rabbitmq/rabbitmq.conf
+              subPath: rabbitmq.conf
+              readOnly: true
+            - name: definitions
+              mountPath: /etc/rabbitmq/definitions.json
+              subPath: definitions.json
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 240
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 10
+          startupProbe:
+            tcpSocket:
+              port: amqp
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 90
+          resources:
+            {{- toYaml .Values.components.rabbitmq.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: rabbitmq-config
+        - name: definitions
+          secret:
+            secretName: rabbitmq-definitions
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.components.rabbitmq.storage | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "rabbitmq" "component" "messaging") | nindent 4 }}
+data:
+  rabbitmq.conf: |
+    management.load_definitions = /etc/rabbitmq/definitions.json
+{{- end }}

@@ -1,0 +1,75 @@
+{{- if .Values.components.vault.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "vault" "component" "secrets") | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: vault
+  ports:
+    - name: http
+      port: 8200
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "vault" "component" "secrets") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault
+        app.kubernetes.io/component: secrets
+        app.kubernetes.io/part-of: {{ .Values.labels.partOf | quote }}
+    spec:
+      serviceAccountName: platform-workload
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: vault
+          image: {{ .Values.components.vault.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - server
+            - -dev
+            - -dev-listen-address=0.0.0.0:8200
+          env:
+            - name: VAULT_DISABLE_MLOCK
+              value: "true"
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.components.vault.devTokenSecretName }}
+                  key: {{ .Values.components.vault.devTokenSecretKey }}
+          ports:
+            - name: http
+              containerPort: 8200
+          readinessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+          resources:
+            {{- toYaml .Values.components.vault.resources | nindent 12 }}
+{{- end }}

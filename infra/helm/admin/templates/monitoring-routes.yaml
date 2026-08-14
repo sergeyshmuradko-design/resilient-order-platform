@@ -1,0 +1,41 @@
+{{- if and .Values.gateway.enabled .Values.observability.monitoring.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "grafana" "component" "monitoring") | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name | quote }}
+  hostnames:
+    - {{ .Values.gateway.hosts.grafana | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: grafana
+          port: {{ .Values.exposure.grafana.port }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prometheus
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "prometheus" "component" "monitoring") | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name | quote }}
+  hostnames:
+    - {{ .Values.gateway.hosts.prometheus | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: prometheus
+          port: {{ .Values.exposure.prometheus.port }}
+{{- end }}

@@ -1,0 +1,78 @@
+{{- if .Values.components.schemaRegistry.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: schema-registry
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "schema-registry" "component" "messaging") | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: schema-registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "schema-registry" "component" "messaging") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: schema-registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: schema-registry
+        app.kubernetes.io/component: messaging
+        app.kubernetes.io/part-of: {{ .Values.labels.partOf | quote }}
+    spec:
+      serviceAccountName: platform-workload
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: schema-registry
+          image: {{ .Values.components.schemaRegistry.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: SCHEMA_REGISTRY_HEAP_OPTS
+              value: {{ .Values.components.schemaRegistry.heapOpts | quote }}
+            - name: SCHEMA_REGISTRY_HOST_NAME
+              value: schema-registry
+            - name: SCHEMA_REGISTRY_LISTENERS
+              value: http://0.0.0.0:8081
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: PLAINTEXT://{{ .Values.components.kafka.clusterName }}-kafka-bootstrap:9092
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 20
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 10
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 90
+          resources:
+            {{- toYaml .Values.components.schemaRegistry.resources | nindent 12 }}
+{{- end }}

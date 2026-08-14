@@ -1,0 +1,20 @@
+{{- if .Values.components.kafka.enabled }}
+{{- range .Values.components.kafka.topics }}
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: {{ .name | replace "." "-" | lower | quote }}
+  labels:
+    strimzi.io/cluster: {{ $.Values.components.kafka.clusterName | quote }}
+    {{- include "resilient-orders.componentLabels" (dict "root" $ "name" "kafka-topic" "component" "messaging") | nindent 4 }}
+spec:
+  topicName: {{ .name | quote }}
+  partitions: {{ .partitions }}
+  replicas: {{ .replicas }}
+  {{- with .config }}
+  config:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+{{- end }}

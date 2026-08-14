@@ -1,0 +1,9 @@
+# Lightweight monitoring profile.
+#
+# This adds only the components needed for the current Grafana dashboards:
+# postgres-exporter, Prometheus and Grafana. It intentionally avoids the heavier
+# kube-prometheus-stack until the project moves to a bigger VM.
+observability:
+  monitoring:
+    enabled: true
+

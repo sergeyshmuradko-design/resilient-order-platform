@@ -1,0 +1,16 @@
+# Local exposure profile.
+#
+# This mirrors Docker Compose-style browser access by turning selected Services
+# into LoadBalancer Services. In k3d, the cluster must also publish the same
+# host ports during cluster creation.
+exposure:
+  orderService:
+    type: LoadBalancer
+    port: 8081
+  prometheus:
+    type: LoadBalancer
+    port: 9090
+  grafana:
+    type: LoadBalancer
+    port: 3000
+

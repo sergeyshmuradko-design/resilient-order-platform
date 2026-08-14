@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [Start Service](#start-service)
+- [Helm / Kubernetes](#helm--kubernetes)
 - [Clean Environment](#clean-environment)
 - [Docker Managing](#docker-managing)
 - [Graylog Managing](#graylog-managing)
@@ -28,6 +29,176 @@
 - [Performance Tests](performance-tests/README.md)
 - [Eclipse Memory Analyzer](infra/mat/README.md)
 - [Grafana Dashboards and Provisioning](infra/grafana/README.md)
+- [Helm / Kubernetes](infra/helm/README.md)
+- [Terraform GitOps Bootstrap](infra/terraform/README.md)
+- [Codespaces GitHub Actions Runner](infra/github-actions/README.md)
+
+## Helm / Kubernetes
+
+Helm is the production-shaped path for running the platform in Kubernetes. The
+current chart is lightweight and keeps strict resource limits and short
+retention windows for local/k3d or small VM environments.
+
+### Requirements
+
+Install or enable:
+
+- Docker
+- kubectl
+- Helm
+- k3d or another Kubernetes cluster
+
+Terraform creates and deletes the local k3d cluster through
+`infra/terraform/codespaces`.
+
+### Build and load local images
+
+```bash
+docker compose build order-service payment-service notification-service
+
+k3d image import \
+  resilient-orders/order-service:local \
+  resilient-orders/payment-service:local \
+  resilient-orders/notification-service:local \
+  -c resilient-orders
+```
+
+### Start with GitOps
+
+The GitOps path starts from Terraform. Terraform prepares the local Kubernetes
+bootstrap layer, installs platform controllers, installs Argo CD, and then Argo
+CD reconciles the first Helm slice from Git.
+
+```bash
+cp .env.example .env
+make terraform-init
+make terraform-plan
+make terraform-apply
+```
+
+The first GitOps slice is deliberately small:
+
+- Argo CD
+- External Secrets Operator
+- Strimzi Kafka Operator
+- Gateway API CRDs and NGINX Gateway Fabric
+- local HashiCorp Vault
+- PostgreSQL
+
+Only Vault and PostgreSQL are reconciled as platform workloads for the first
+verification pass. RabbitMQ, Kafka, Schema Registry, services and observability
+stay in Helm values for later stages.
+
+### Start from GitHub Actions
+
+For Codespaces, use a self-hosted GitHub Actions runner because GitHub-hosted
+runners cannot access your Codespaces Docker daemon or local kubeconfig.
+
+In one Codespaces terminal:
+
+```bash
+export GITHUB_REPOSITORY="OWNER/REPOSITORY"
+make github-runner-start
+```
+
+Then run the manual workflow in GitHub:
+
+```text
+Actions -> GitOps Bootstrap Codespaces -> Run workflow
+```
+
+Use `apply=false, destroy=false` for a plan, `apply=true, destroy=false` to
+create/update, and `apply=true, destroy=true` to remove platform resources and
+delete the local k3d cluster.
+
+The runner waits for the workflow job. Terraform does not start automatically
+when the runner starts.
+
+### Check status
+
+```bash
+kubectl get pods -n resilient-orders-platform
+kubectl get pods -n resilient-orders
+kubectl get pods -n argocd
+kubectl get applications -n argocd
+kubectl get pods -n strimzi-system
+kubectl get externalsecret -n resilient-orders-platform
+kubectl get secret platform-secrets -n resilient-orders-platform
+helm list -A
+```
+
+### Open UIs
+
+In Docker Compose, ports are published directly with mappings like
+`"3000:3000"`. In Kubernetes, Services stay internal by default and traffic is
+routed through Gateway API.
+
+With the local k3d command above, one host port is published:
+
+- Order Service: http://order.localhost:8080
+- Grafana: http://grafana.localhost:8080
+- Prometheus: http://prometheus.localhost:8080
+
+If you do not install the Gateway controller, use `kubectl port-forward`
+instead:
+
+```bash
+kubectl port-forward -n resilient-orders-platform svc/grafana 3000:3000
+kubectl port-forward -n resilient-orders-platform svc/prometheus 9090:9090
+kubectl port-forward -n resilient-orders svc/order-service 8081:8081
+```
+
+Stop port forwarding with `Ctrl+C` in the terminal where it is running.
+
+### Resource impact
+
+This stack is heavier than Docker Compose because Kubernetes itself also runs
+control-plane components. For a local k3d/k3s demo, expect approximately:
+
+- Kubernetes/k3d baseline: 300-700 MB RAM
+- External Secrets Operator: 50-150 MB RAM
+- local HashiCorp Vault dev server: roughly 100-200 MB RAM under the configured limits
+- Strimzi Operator: roughly 100-300 MB RAM under the configured limits
+- NGINX Gateway Fabric: roughly 100-250 MB RAM under the configured limits
+- application stack without monitoring: roughly 1.8-3.0 GB RAM under the current limits
+- monitoring profile: additional 400-700 MB RAM for Grafana, Prometheus and postgres-exporter
+- persistent storage requests: Postgres 512 MiB, RabbitMQ 512 MiB, Kafka 512 MiB, namespace quota up to 3 GiB
+- ephemeral retention: Prometheus `emptyDir` 256 MiB, Grafana `emptyDir` 128 MiB
+
+In practice, the real usage should be lower than the limits when the system is
+idle, but image storage will still consume disk space. The heaviest images are
+usually Grafana, Schema Registry, Strimzi/Kafka and the Spring Boot service
+images.
+
+### Full cleanup
+
+Remove all Kubernetes resources created for this project:
+
+```bash
+make terraform-destroy
+```
+
+This destroys the platform layer first and then runs the Codespaces layer
+destroy provisioner, which deletes the local k3d cluster. If Terraform state is
+lost, the equivalent manual fallback is:
+
+```bash
+k3d cluster delete resilient-orders
+```
+
+If a persistent self-hosted runner is still registered, clean it up:
+
+```bash
+make github-runner-cleanup
+```
+
+Verify that nothing project-related is still running:
+
+```bash
+kubectl get pods -A
+helm list -A
+docker ps
+```
 
 ## start service
 ./gradlew :services:notification-service:build :services:order-service:build

@@ -1,0 +1,6 @@
+# Future Oracle VM profile.
+#
+# Keep the same Kubernetes contract but leave room for Nexus image names,
+# imagePullSecrets, Gateway API and OCI Vault SecretStore values.
+secrets:
+  mode: externalSecret
