@@ -22,6 +22,10 @@ jobs:
 
     env:
       TF_IN_AUTOMATION: "true"
+      # GitHub Actions does not reliably inherit shell exports from the script
+      # that registered the self-hosted runner. Keep the marker path explicit so
+      # the runner start script can prune the same local directory after destroy.
+      RUNNER_DIR: /workspaces/resilient-order-platform/.local/github-runner
 
     steps:
       - name: Checkout repository
@@ -105,5 +109,6 @@ jobs:
       - name: Mark local runner workspace for pruning
         if: ${{ inputs.destroy && inputs.apply && success() }}
         run: |
+          test -n "$RUNNER_DIR"
           mkdir -p "$RUNNER_DIR"
           touch "$RUNNER_DIR/.destroy-succeeded"
