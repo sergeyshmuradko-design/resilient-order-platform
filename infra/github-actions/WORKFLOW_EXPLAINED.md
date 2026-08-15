@@ -247,6 +247,18 @@ environment variables become Terraform variables:
 Applies the saved platform plan after the k3d cluster exists.
 
 ```yaml
+- name: Pre-destroy Kubernetes cleanup
+  if: ${{ inputs.destroy && inputs.apply }}
+  run: bash infra/terraform/scripts/pre-destroy-kubernetes-cleanup.sh
+```
+
+Runs only for explicit destroy runs. It removes known local GitOps/operator
+finalizers from Argo CD and External Secrets custom resources before Terraform
+starts deleting Helm releases and namespaces. This prevents a local namespace
+from getting stuck in `Terminating` after its controller has already been
+removed.
+
+```yaml
 - name: Platform Terraform destroy
   if: ${{ inputs.destroy && inputs.apply }}
   env:

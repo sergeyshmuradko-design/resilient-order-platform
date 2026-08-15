@@ -72,6 +72,10 @@ jobs:
         if: ${{ inputs.apply && !inputs.destroy }}
         run: terraform -chdir=infra/terraform/platform apply -auto-approve tfplan
 
+      - name: Pre-destroy Kubernetes cleanup
+        if: ${{ inputs.destroy && inputs.apply }}
+        run: bash infra/terraform/scripts/pre-destroy-kubernetes-cleanup.sh
+
       - name: Platform Terraform destroy
         if: ${{ inputs.destroy && inputs.apply }}
         env:
