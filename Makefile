@@ -1,4 +1,4 @@
-.PHONY: build infra-up up stop down ps config terraform-fmt terraform-codespaces-init terraform-codespaces-plan terraform-codespaces-apply terraform-codespaces-destroy terraform-platform-init terraform-platform-validate terraform-platform-plan terraform-platform-apply terraform-platform-destroy terraform-init terraform-validate terraform-plan terraform-apply terraform-destroy github-runner-start github-runner-cleanup helm-external-secrets helm-strimzi-operator helm-gateway-api-crds helm-nginx-gateway helm-operators helm-vault-token-source helm-vault-seed helm-db-provision helm-images-import helm-lint helm-template-dev helm-template-monitoring helm-template-local-expose helm-template-local-gateway helm-template-codespaces helm-template-postgres-only helm-dev helm-monitoring helm-local-expose helm-local-gateway helm-codespaces helm-platform helm-schema-registry helm-apps helm-observability helm-prod-like helm-tracing helm-load helm-delete helm-delete-all load-build load-up load-stop load-down load-config
+.PHONY: build infra-up up stop down ps config terraform-fmt terraform-codespaces-init terraform-codespaces-plan terraform-codespaces-apply terraform-codespaces-destroy terraform-platform-init terraform-platform-validate terraform-platform-plan terraform-platform-apply terraform-platform-destroy terraform-init terraform-validate terraform-plan terraform-apply terraform-destroy github-runner-start github-runner-cleanup github-runner-prune helm-external-secrets helm-strimzi-operator helm-gateway-api-crds helm-nginx-gateway helm-operators helm-vault-token-source helm-vault-seed helm-db-provision helm-images-import helm-lint helm-template-dev helm-template-monitoring helm-template-local-expose helm-template-local-gateway helm-template-codespaces helm-template-postgres-only helm-dev helm-monitoring helm-local-expose helm-local-gateway helm-codespaces helm-platform helm-schema-registry helm-apps helm-observability helm-prod-like helm-tracing helm-load helm-delete helm-delete-all load-build load-up load-stop load-down load-config
 
 # Compose command used for the load-test variant.
 # The second file overrides only the settings that are different for load tests.
@@ -142,6 +142,13 @@ github-runner-start:
 # themselves after finishing one job.
 github-runner-cleanup:
 	bash infra/github-actions/cleanup-codespaces-runner.sh
+
+# Remove local runner working data after a successful Terraform destroy.
+#
+# This keeps the runner install available but removes cached workflow checkouts,
+# diagnostics and old runner binaries that can make `.local/` several GiB.
+github-runner-prune:
+	bash infra/github-actions/prune-codespaces-runner.sh
 
 # -----------------------------
 # Helm: production-shaped stack

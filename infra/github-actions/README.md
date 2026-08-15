@@ -136,11 +136,17 @@ make github-runner-start
 
 ```bash
 make github-runner-cleanup
+make github-runner-prune
 ```
 
 If the runner is already gone from GitHub, this command may print a harmless
 remove-token error. You can also delete the runner from GitHub UI under
 repository runner settings.
+
+`github-runner-prune` removes local workflow checkouts, diagnostics and old
+runner binary folders under `.local/github-runner`. The bootstrap workflow also
+marks the runner for pruning after a successful `destroy=true` run; the start
+script performs the prune only after the GitHub Actions job has fully exited.
 
 ## What Actually Happens
 
@@ -162,8 +168,11 @@ Starting the runner does not start Terraform. The sequence is:
 9. Terraform runs from `infra/terraform`.
 10. The workflow plans or applies `infra/terraform/codespaces` first.
 11. The workflow plans or applies `infra/terraform/platform` second.
-12. With `destroy=true`, the workflow destroys `platform` first and then
-    destroys `codespaces`, which deletes the k3d cluster.
+12. With `destroy=true`, the workflow deletes Argo CD Applications first,
+    destroys `platform`, then destroys `codespaces`, which deletes the k3d
+    cluster.
+13. After a successful destroy, the runner start script prunes local runner
+    working data so `.local/github-runner` does not keep growing.
 
 ## Script Explanation
 
@@ -176,3 +185,7 @@ Detailed line-by-line notes:
 Terraform bootstrap explanation:
 
 - [Terraform files explained](../terraform/TERRAFORM_EXPLAINED.md)
+
+Service CI/CD:
+
+- [Service CI/CD](SERVICE_CICD.md)

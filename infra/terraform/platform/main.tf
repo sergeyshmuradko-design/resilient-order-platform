@@ -337,6 +337,49 @@ resource "helm_release" "argocd" {
   depends_on = [kubernetes_namespace_v1.argocd]
 }
 
+resource "helm_release" "argocd_image_updater" {
+  count = var.enable_argocd_image_updater ? 1 : 0
+
+  name       = "argocd-image-updater"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argocd-image-updater"
+  version    = var.argocd_image_updater_chart_version
+  namespace  = var.argocd_namespace
+
+  wait    = true
+  timeout = 180
+
+  # The updater is intentionally scoped to the single application release used
+  # in this demo and checks the registry slowly. In production this same chart
+  # can watch more Applications, but local Codespaces runs should stay quiet.
+  set_list {
+    name = "extraArgs"
+    value = [
+      "--interval=10m",
+      "--max-concurrency=1",
+      "--match-application-name=resilient-orders-app"
+    ]
+  }
+  set {
+    name  = "resources.requests.cpu"
+    value = "10m"
+  }
+  set {
+    name  = "resources.requests.memory"
+    value = "48Mi"
+  }
+  set {
+    name  = "resources.limits.cpu"
+    value = "100m"
+  }
+  set {
+    name  = "resources.limits.memory"
+    value = "128Mi"
+  }
+
+  depends_on = [helm_release.argocd]
+}
+
 # This is the GitOps handoff: Terraform installs Argo CD, then creates one
 # Argo CD Application. After that Argo CD continuously reconciles the Helm chart
 # from Git instead of Terraform applying application manifests directly.
@@ -355,8 +398,28 @@ resource "terraform_data" "argocd_platform_application" {
 
   depends_on = [
     helm_release.argocd,
+    helm_release.argocd_image_updater,
     helm_release.external_secrets,
     terraform_data.local_vault_token_secrets
+  ]
+}
+
+resource "terraform_data" "argocd_app_application" {
+  count = var.enable_argocd_app_application && var.repository_url != "" ? 1 : 0
+
+  triggers_replace = {
+    repository_url         = var.repository_url
+    target_revision        = var.target_revision
+    container_image_prefix = var.container_image_prefix
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-ec"]
+    command     = "cat <<'YAML' | kubectl apply -f -\n${templatefile("${path.module}/../templates/resilient-orders-app-application.yaml.tftpl", { repository_url = var.repository_url, target_revision = var.target_revision, application_namespace = var.application_namespace, container_image_prefix = var.container_image_prefix })}\nYAML"
+  }
+
+  depends_on = [
+    terraform_data.argocd_platform_application
   ]
 }
 
@@ -375,5 +438,5 @@ resource "terraform_data" "local_vault_seed" {
     command     = "bash ${path.module}/../scripts/seed-local-vault.sh ${var.local_env_file} ${var.platform_namespace}"
   }
 
-  depends_on = [terraform_data.argocd_platform_application]
+  depends_on = [terraform_data.argocd_app_application]
 }

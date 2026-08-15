@@ -8,7 +8,9 @@ It installs the GitOps bootstrap platform:
 - External Secrets Operator;
 - Gateway API CRDs and NGINX Gateway Fabric;
 - Argo CD;
+- Argo CD Image Updater;
 - the first Argo CD Application for `infra/helm/admin`;
+- the first service-level Argo CD Application for `infra/helm/app`;
 - local Vault bootstrap/seed helpers for Codespaces.
 
 Strimzi Kafka Operator is supported by this layer, but disabled by default in
@@ -28,6 +30,12 @@ terraform -chdir=infra/terraform/platform apply \
 The local Vault seed helper waits for Argo CD to create `deployment/vault` and
 then waits for that Deployment to become available before writing `.env` values
 into Vault.
+
+The app Application uses `infra/helm/app/values-payment-service-gitops.yaml`.
+It enables `payment-service` and points the Deployment at the GHCR `:main` tag.
+The service CI/CD workflow publishes the image, and Argo CD Image Updater
+updates the live Argo CD Application to the newest digest without committing
+image changes back to Git.
 
 ## Argo CD UI
 
