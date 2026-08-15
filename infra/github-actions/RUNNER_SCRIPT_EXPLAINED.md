@@ -28,6 +28,13 @@ Turns on strict Bash behavior:
 - `-o pipefail`: if one command in a pipeline fails, the whole pipeline fails.
 
 ```bash
+workspace_dir="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+```
+
+Finds the root directory of the current Git checkout. If the command is not
+running inside Git for some reason, falls back to the current directory.
+
+```bash
 repo="${GITHUB_REPOSITORY:-}"
 ```
 
@@ -54,6 +61,34 @@ fi
 ```
 
 Ends the `if` block.
+
+```bash
+if [ -z "${repo}" ]; then
+```
+
+If GitHub CLI could not detect the repository, try a Git-only fallback.
+
+```bash
+origin_url="$(git -C "${workspace_dir}" remote get-url origin 2>/dev/null || true)"
+```
+
+Reads the `origin` remote URL from the workspace repository. `-C` tells Git to
+run as if it started in `workspace_dir`.
+
+```bash
+repo="$(printf '%s\n' "${origin_url}" \
+  | sed -nE 's#^(git@github.com:|https://github.com/)([^/.]+/[^/.]+)(\.git)?$#\2#p')"
+```
+
+Converts a GitHub remote URL like
+`https://github.com/owner/repo.git` or `git@github.com:owner/repo.git` into the
+`owner/repo` format required by the GitHub Actions runner.
+
+```bash
+fi
+```
+
+Ends the Git remote fallback.
 
 ```bash
 if [ -z "${repo}" ]; then
@@ -107,6 +142,31 @@ runner_ephemeral="${RUNNER_EPHEMERAL:-true}"
 
 Controls whether the runner unregisters itself after one job. Default is
 ephemeral, which is safer for a temporary Codespaces setup.
+
+```bash
+runner_version="${RUNNER_VERSION:-2.334.0}"
+```
+
+Pins the GitHub Actions Runner version by default. This avoids a startup-time
+call to GitHub Releases API and keeps local bootstrap behavior reproducible.
+
+```bash
+export TF_VAR_local_env_file="${TF_VAR_local_env_file:-${workspace_dir}/.env}"
+```
+
+Exports the Terraform variable used by the platform layer to find the local
+`.env` file. The workflow checkout does not contain `.env`, so the runner
+process passes the real Codespaces workspace path to Terraform.
+
+```bash
+echo "Repository: ${repo}"
+echo "Runner version: ${runner_version}"
+echo "Terraform local env file: ${TF_VAR_local_env_file}"
+```
+
+Prints the important non-secret runtime settings before registration. This
+makes troubleshooting easier when the workflow runs in a separate checkout
+directory.
 
 ```bash
 token="${RUNNER_TOKEN:-}"
@@ -175,31 +235,6 @@ if [ ! -x ./config.sh ]; then
 
 If `config.sh` does not exist or is not executable, the runner package has not
 been downloaded/extracted yet.
-
-```bash
-runner_version="${RUNNER_VERSION:-}"
-```
-
-Reads an optional pinned runner version. Usually you leave it unset.
-
-```bash
-if [ -z "${runner_version}" ]; then
-```
-
-If no version is pinned, discover the latest release.
-
-```bash
-runner_version="$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | sed -n 's/.*"tag_name": "v\([^"]*\)".*/\1/p' | head -n 1)"
-```
-
-Downloads GitHub runner release metadata, extracts the `tag_name`, removes the
-leading `v`, and takes the first match.
-
-```bash
-fi
-```
-
-Ends version discovery.
 
 ```bash
 archive="actions-runner-linux-x64-${runner_version}.tar.gz"

@@ -50,9 +50,13 @@ Then edit `.env` locally. Do not commit it.
 5. Start the runner in a dedicated terminal and leave that terminal open:
 
 ```bash
-export GITHUB_REPOSITORY="OWNER/REPOSITORY"
 make github-runner-start
 ```
+
+The script detects `GITHUB_REPOSITORY` from `gh` or `git remote`, pins a known
+working GitHub Actions Runner version, and exports `TF_VAR_local_env_file` to
+the local workspace `.env`. Override these variables only when testing a
+different repository, runner version, or secret source.
 
 6. In GitHub, open:
 
@@ -124,7 +128,6 @@ Repository -> Settings -> Actions -> Runners -> New self-hosted runner
 Then run:
 
 ```bash
-export GITHUB_REPOSITORY="OWNER/REPOSITORY"
 export RUNNER_TOKEN="token-from-github-ui"
 make github-runner-start
 ```

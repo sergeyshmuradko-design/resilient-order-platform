@@ -6,9 +6,16 @@ set -euo pipefail
 # Nothing is executed when the runner starts. It only connects to GitHub and
 # waits for a workflow job whose `runs-on` labels match this runner.
 
+workspace_dir="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
 repo="${GITHUB_REPOSITORY:-}"
 if [ -z "${repo}" ] && command -v gh >/dev/null 2>&1; then
   repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"
+fi
+if [ -z "${repo}" ]; then
+  origin_url="$(git -C "${workspace_dir}" remote get-url origin 2>/dev/null || true)"
+  repo="$(printf '%s\n' "${origin_url}" \
+    | sed -nE 's#^(git@github.com:|https://github.com/)([^/.]+/[^/.]+)(\.git)?$#\2#p')"
 fi
 
 if [ -z "${repo}" ]; then
@@ -20,6 +27,16 @@ runner_dir="${RUNNER_DIR:-${PWD}/.local/github-runner}"
 runner_name="${RUNNER_NAME:-codespaces-${CODESPACE_NAME:-local}}"
 runner_labels="${RUNNER_LABELS:-codespaces,k3d,resilient-orders}"
 runner_ephemeral="${RUNNER_EPHEMERAL:-true}"
+runner_version="${RUNNER_VERSION:-2.334.0}"
+
+# Terraform runs inside the self-hosted runner checkout, where `.env` is not
+# committed. Export the local workspace path so Terraform can seed local Vault
+# from the developer-only `.env` file during the Codespaces bootstrap.
+export TF_VAR_local_env_file="${TF_VAR_local_env_file:-${workspace_dir}/.env}"
+
+echo "Repository: ${repo}"
+echo "Runner version: ${runner_version}"
+echo "Terraform local env file: ${TF_VAR_local_env_file}"
 
 token="${RUNNER_TOKEN:-}"
 if [ -z "${token}" ] && command -v gh >/dev/null 2>&1; then
@@ -35,11 +52,6 @@ mkdir -p "${runner_dir}"
 cd "${runner_dir}"
 
 if [ ! -x ./config.sh ]; then
-  runner_version="${RUNNER_VERSION:-}"
-  if [ -z "${runner_version}" ]; then
-    runner_version="$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | sed -n 's/.*"tag_name": "v\([^"]*\)".*/\1/p' | head -n 1)"
-  fi
-
   archive="actions-runner-linux-x64-${runner_version}.tar.gz"
   curl -fsSLO "https://github.com/actions/runner/releases/download/v${runner_version}/${archive}"
   tar xzf "${archive}"
