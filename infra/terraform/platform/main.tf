@@ -356,7 +356,8 @@ resource "helm_release" "argocd_image_updater" {
     name = "extraArgs"
     value = [
       "--interval=10m",
-      "--max-concurrency=1",
+      "--max-concurrent-apps=1",
+      "--max-concurrent-reconciles=1",
       "--match-application-name=resilient-orders-app"
     ]
   }
