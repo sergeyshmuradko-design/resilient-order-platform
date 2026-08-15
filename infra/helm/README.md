@@ -58,6 +58,12 @@ overlays for one concern only, such as load testing or monitoring.
 keeps Gateway, Vault, ExternalSecret and PostgreSQL enabled so the bootstrap can
 be tested without the full application stack or messaging operators.
 
+`infra/helm/app/values-payment-service-gitops.yaml` is the first service-level
+GitOps profile. It enables `payment-service` and points it at the GHCR `:main`
+tag. The service CI/CD workflow publishes immutable SHA tags and the moving
+`main` tag; Argo CD Image Updater resolves the newest digest without committing
+image changes back to Git.
+
 ## Ownership model
 
 Platform/admin-owned:
@@ -131,11 +137,18 @@ kubectl get secret platform-secrets -n resilient-orders
 The local Gateway profile keeps application Services internal and exposes them
 through one Gateway controller endpoint. Open:
 
+- http://payment.localhost:8080/actuator/health
+- http://payment.localhost:8080/actuator/prometheus
 - http://order.localhost:8080
+- http://notification.localhost:8080
 - http://argocd.localhost:8080
 - http://vault.localhost:8080
 - http://grafana.localhost:8080
 - http://prometheus.localhost:8080
+
+Swagger/OpenAPI endpoints use the same service host, for example
+`http://payment.localhost:8080/swagger-ui/index.html`, if that service includes
+SpringDoc and exposes those endpoints.
 
 In k3d, the `--port '8080:80@loadbalancer'` flag publishes one Docker host port
 to the Gateway controller. In a cloud cluster, a real cloud load balancer would

@@ -16,6 +16,12 @@ variable "repository_url" {
   default     = ""
 }
 
+variable "container_image_prefix" {
+  description = "Container registry prefix for service images, without the service name. Example: ghcr.io/owner/repository."
+  type        = string
+  default     = "ghcr.io/sergeyshmuradko-design/resilient-order-platform"
+}
+
 variable "target_revision" {
   description = "Git revision watched by Argo CD. Use main locally; use a release branch/tag later."
   type        = string
@@ -88,6 +94,18 @@ variable "enable_argocd_application" {
   default     = true
 }
 
+variable "enable_argocd_app_application" {
+  description = "Create the Argo CD Application that syncs the first application CI/CD slice."
+  type        = bool
+  default     = true
+}
+
+variable "enable_argocd_image_updater" {
+  description = "Install Argo CD Image Updater. It watches registry image digests and updates the live Argo CD Application without committing to Git."
+  type        = bool
+  default     = true
+}
+
 variable "external_secrets_chart_version" {
   description = "External Secrets Operator Helm chart version. Pin for reproducible local/prod runs."
   type        = string
@@ -110,4 +128,10 @@ variable "argocd_chart_version" {
   description = "Argo CD Helm chart version."
   type        = string
   default     = "10.1.3"
+}
+
+variable "argocd_image_updater_chart_version" {
+  description = "Argo CD Image Updater Helm chart version. Pin to keep registry polling behavior reproducible."
+  type        = string
+  default     = "1.2.4"
 }

@@ -247,30 +247,33 @@ environment variables become Terraform variables:
 Applies the saved platform plan after the k3d cluster exists.
 
 ```yaml
-- name: Delete GitOps platform application
+- name: Delete GitOps applications
   if: ${{ inputs.destroy && inputs.apply }}
   run: |
-    if kubectl get application resilient-orders-platform -n argocd >/dev/null 2>&1; then
-      kubectl patch application resilient-orders-platform \
-        -n argocd \
-        --type merge \
-        --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
+    for app in resilient-orders-app resilient-orders-platform; do
+      if kubectl get application "$app" -n argocd >/dev/null 2>&1; then
+        kubectl patch application "$app" \
+          -n argocd \
+          --type merge \
+          --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
 
-      kubectl delete application resilient-orders-platform \
-        -n argocd \
-        --wait=true \
-        --timeout=180s
-    else
-      echo "Argo CD Application resilient-orders-platform is already absent."
-    fi
+        kubectl delete application "$app" \
+          -n argocd \
+          --wait=true \
+          --timeout=180s
+      else
+        echo "Argo CD Application $app is already absent."
+      fi
+    done
 ```
 
 Runs only for explicit destroy runs. This is the GitOps destroy ordering step:
-Argo CD owns the resources rendered from `infra/helm/admin`, so the workflow
-first adds the standard Argo CD cascade finalizer and deletes the Application.
-Argo CD then prunes its managed resources while its controller is still running.
-Only after that does Terraform remove platform Helm releases, operators and
-namespaces.
+Argo CD owns the resources rendered from `infra/helm/app` and
+`infra/helm/admin`, so the workflow first deletes the application chart
+Application, then the platform chart Application. The standard Argo CD cascade
+finalizer lets Argo CD prune managed resources while its controller is still
+running. Only after that does Terraform remove platform Helm releases,
+operators and namespaces.
 
 ```yaml
 - name: Platform Terraform destroy
@@ -293,6 +296,19 @@ Kubernetes cluster disappears.
 
 Destroys the local Codespaces layer second. Its `terraform_data` destroy
 provisioner deletes the k3d cluster.
+
+```yaml
+- name: Mark local runner workspace for pruning
+  if: ${{ inputs.destroy && inputs.apply && success() }}
+  run: |
+    mkdir -p "$RUNNER_DIR"
+    touch "$RUNNER_DIR/.destroy-succeeded"
+```
+
+Creates a marker file outside the workflow checkout. The runner start script
+sees this marker after `run.sh` exits and then prunes `.local/github-runner`
+working data. The workflow itself does not delete `_work` while GitHub Actions
+post-steps may still be running.
 
 ## Safe Modes
 

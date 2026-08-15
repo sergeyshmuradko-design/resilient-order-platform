@@ -7,6 +7,8 @@ fullnameOverride: ""
 labels:
   partOf: resilient-order-platform
 
+imagePullSecrets: []
+
 platform:
   namespace: resilient-orders-platform
   postgresHost: postgres.resilient-orders-platform.svc.cluster.local
@@ -62,7 +64,9 @@ routes:
   gatewayName: platform-gateway
   gatewayNamespace: resilient-orders-platform
   hosts:
+    paymentService: payment.localhost
     orderService: order.localhost
+    notificationService: notification.localhost
 
 secrets:
   # The app namespace receives its own platform-secrets Secret from the same

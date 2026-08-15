@@ -52,6 +52,19 @@ That means the first verification slice is intentionally small: Gateway API,
 Vault, ExternalSecret and PostgreSQL. Messaging operators and brokers stay out
 of the default slice until they are explicitly enabled.
 
+Terraform also creates the first service-level Application:
+
+```text
+infra/helm/app
+infra/helm/app/values-payment-service-gitops.yaml
+```
+
+That Application enables the first lightweight service slice,
+`payment-service`. The `Service CI/CD` workflow publishes service images to
+GHCR. Argo CD Image Updater watches the `payment-service:main` image, resolves
+the newest digest and updates the live Argo CD Application without committing
+image tag changes back to Git.
+
 ## Cloud Migration Notes
 
 For Oracle Cloud, replace only the cluster/runtime layer first:
@@ -95,11 +108,11 @@ cluster. The Codespaces layer uses a `terraform_data` destroy provisioner to run
 k3d cluster delete resilient-orders || true
 ```
 
-The GitHub Actions workflow performs one extra GitOps ordering step before the
-platform destroy: it deletes the `resilient-orders-platform` Argo CD
-Application with the standard Argo CD cascade finalizer while Argo CD is still
-running. That lets Argo CD prune the resources it owns before Terraform removes
-operators and namespaces.
+The GitHub Actions workflow performs an extra GitOps ordering step before the
+platform destroy: it deletes the `resilient-orders-app` Application first and
+then `resilient-orders-platform`, both with the standard Argo CD cascade
+finalizer while Argo CD is still running. That lets Argo CD prune the resources
+it owns before Terraform removes operators and namespaces.
 
 If Terraform state is unavailable, run the same fallback manually:
 

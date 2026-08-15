@@ -13,7 +13,9 @@ routes:
   enabled: true
   gatewayName: platform-gateway
   hosts:
+    paymentService: payment.localhost
     orderService: order.localhost
+    notificationService: notification.localhost
 
 exposure:
   orderService:

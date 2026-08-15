@@ -28,6 +28,8 @@ runner_name="${RUNNER_NAME:-codespaces-${CODESPACE_NAME:-local}}"
 runner_labels="${RUNNER_LABELS:-codespaces,k3d,resilient-orders}"
 runner_ephemeral="${RUNNER_EPHEMERAL:-true}"
 runner_version="${RUNNER_VERSION:-2.334.0}"
+export RUNNER_DIR="${runner_dir}"
+export RUNNER_VERSION="${runner_version}"
 
 # Terraform runs inside the self-hosted runner checkout, where `.env` is not
 # committed. Export the local workspace path so Terraform can seed local Vault
@@ -73,3 +75,7 @@ fi
 
 ./config.sh "${args[@]}"
 ./run.sh
+
+if [ -f "${runner_dir}/.destroy-succeeded" ]; then
+  bash "${workspace_dir}/infra/github-actions/prune-codespaces-runner.sh"
+fi

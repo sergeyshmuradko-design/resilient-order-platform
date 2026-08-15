@@ -151,6 +151,15 @@ Pins the GitHub Actions Runner version by default. This avoids a startup-time
 call to GitHub Releases API and keeps local bootstrap behavior reproducible.
 
 ```bash
+export RUNNER_DIR="${runner_dir}"
+export RUNNER_VERSION="${runner_version}"
+```
+
+Exports the resolved runner directory and version to workflow jobs. The
+bootstrap workflow uses `RUNNER_DIR` to place a destroy-success marker outside
+the checkout, and the prune helper uses both values to remove old runner data.
+
+```bash
 export TF_VAR_local_env_file="${TF_VAR_local_env_file:-${workspace_dir}/.env}"
 ```
 
@@ -351,6 +360,17 @@ registers the runner in GitHub.
 
 Starts the runner process. This terminal stays occupied while the runner listens
 for jobs and executes them.
+
+```bash
+if [ -f "${runner_dir}/.destroy-succeeded" ]; then
+  bash "${workspace_dir}/infra/github-actions/prune-codespaces-runner.sh"
+fi
+```
+
+Runs after the GitHub Actions job has fully exited. If the bootstrap workflow
+successfully destroyed the local cluster, it creates `.destroy-succeeded`; this
+block then prunes local runner working data without deleting `_work` during
+workflow post-steps.
 
 ## cleanup-codespaces-runner.sh
 

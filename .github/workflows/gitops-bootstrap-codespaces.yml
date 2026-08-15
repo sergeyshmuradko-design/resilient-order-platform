@@ -72,22 +72,24 @@ jobs:
         if: ${{ inputs.apply && !inputs.destroy }}
         run: terraform -chdir=infra/terraform/platform apply -auto-approve tfplan
 
-      - name: Delete GitOps platform application
+      - name: Delete GitOps applications
         if: ${{ inputs.destroy && inputs.apply }}
         run: |
-          if kubectl get application resilient-orders-platform -n argocd >/dev/null 2>&1; then
-            kubectl patch application resilient-orders-platform \
-              -n argocd \
-              --type merge \
-              --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
+          for app in resilient-orders-app resilient-orders-platform; do
+            if kubectl get application "$app" -n argocd >/dev/null 2>&1; then
+              kubectl patch application "$app" \
+                -n argocd \
+                --type merge \
+                --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
 
-            kubectl delete application resilient-orders-platform \
-              -n argocd \
-              --wait=true \
-              --timeout=180s
-          else
-            echo "Argo CD Application resilient-orders-platform is already absent."
-          fi
+              kubectl delete application "$app" \
+                -n argocd \
+                --wait=true \
+                --timeout=180s
+            else
+              echo "Argo CD Application $app is already absent."
+            fi
+          done
 
       - name: Platform Terraform destroy
         if: ${{ inputs.destroy && inputs.apply }}
@@ -99,3 +101,9 @@ jobs:
       - name: Codespaces Terraform destroy
         if: ${{ inputs.destroy && inputs.apply }}
         run: terraform -chdir=infra/terraform/codespaces destroy -auto-approve
+
+      - name: Mark local runner workspace for pruning
+        if: ${{ inputs.destroy && inputs.apply && success() }}
+        run: |
+          mkdir -p "$RUNNER_DIR"
+          touch "$RUNNER_DIR/.destroy-succeeded"

@@ -62,7 +62,8 @@ handoff.
 - namespace variables: platform, application, external-secrets, argocd,
   strimzi and nginx-gateway.
 - feature flags: optionally enable Strimzi, keep Gateway controller enabled by
-  default, enable local Vault seed, and create the Argo CD Application.
+  default, enable local Vault seed, create the platform Argo CD Application and
+  create the first app Argo CD Application.
 - chart version variables: pinned versions for reproducible installs.
 
 `platform/main.tf`
@@ -94,6 +95,8 @@ handoff.
   still works with the built-in `admin` user.
 - `terraform_data.argocd_platform_application`: renders the Argo CD Application
   template and applies it with `kubectl`.
+- `terraform_data.argocd_app_application`: renders the Argo CD Application for
+  the first payment-service GitOps slice and applies it with `kubectl`.
 - `terraform_data.local_vault_seed`: waits for Vault and writes `.env` values
   into local Vault.
 
