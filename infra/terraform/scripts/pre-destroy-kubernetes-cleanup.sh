@@ -18,32 +18,36 @@ set -euo pipefail
 patch_namespaced_finalizers() {
   local namespace="${1}"
   local resource_type="${2}"
+  local resource_names
 
-  kubectl get "${resource_type}" \
+  resource_names="$(kubectl get "${resource_type}" \
     --namespace "${namespace}" \
-    --output name 2>/dev/null \
-    | while IFS= read -r resource_name; do
-        [ -n "${resource_name}" ] || continue
-        echo "Removing finalizers from ${resource_name} in namespace ${namespace}"
-        kubectl patch "${resource_name}" \
-          --namespace "${namespace}" \
-          --type merge \
-          --patch '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
-      done
+    --output name 2>/dev/null || true)"
+
+  while IFS= read -r resource_name; do
+    [ -n "${resource_name}" ] || continue
+    echo "Removing finalizers from ${resource_name} in namespace ${namespace}"
+    kubectl patch "${resource_name}" \
+      --namespace "${namespace}" \
+      --type merge \
+      --patch '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
+  done <<< "${resource_names}"
 }
 
 patch_cluster_finalizers() {
   local resource_type="${1}"
+  local resource_names
 
-  kubectl get "${resource_type}" \
-    --output name 2>/dev/null \
-    | while IFS= read -r resource_name; do
-        [ -n "${resource_name}" ] || continue
-        echo "Removing finalizers from cluster resource ${resource_name}"
-        kubectl patch "${resource_name}" \
-          --type merge \
-          --patch '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
-      done
+  resource_names="$(kubectl get "${resource_type}" \
+    --output name 2>/dev/null || true)"
+
+  while IFS= read -r resource_name; do
+    [ -n "${resource_name}" ] || continue
+    echo "Removing finalizers from cluster resource ${resource_name}"
+    kubectl patch "${resource_name}" \
+      --type merge \
+      --patch '{"metadata":{"finalizers":[]}}' >/dev/null 2>&1 || true
+  done <<< "${resource_names}"
 }
 
 for namespace in resilient-orders-platform resilient-orders argocd; do
