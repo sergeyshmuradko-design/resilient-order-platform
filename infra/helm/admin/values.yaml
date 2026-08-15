@@ -96,8 +96,15 @@ gateway:
   className: nginx
   hostname: "*.localhost"
   hosts:
+    argocd: argocd.localhost
+    vault: vault.localhost
     grafana: grafana.localhost
     prometheus: prometheus.localhost
+  routes:
+    argocd:
+      enabled: false
+    vault:
+      enabled: true
   allowedRoutes:
     namespaces:
       from: Selector

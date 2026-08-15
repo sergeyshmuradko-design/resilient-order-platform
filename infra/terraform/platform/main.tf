@@ -9,8 +9,10 @@ locals {
 
 resource "kubernetes_namespace_v1" "platform" {
   metadata {
-    name   = var.platform_namespace
-    labels = local.common_labels
+    name = var.platform_namespace
+    labels = merge(local.common_labels, {
+      "resilient-orders.io/gateway-routes" = "allowed"
+    })
   }
 }
 
@@ -32,8 +34,10 @@ resource "kubernetes_namespace_v1" "external_secrets" {
 
 resource "kubernetes_namespace_v1" "argocd" {
   metadata {
-    name   = var.argocd_namespace
-    labels = local.common_labels
+    name = var.argocd_namespace
+    labels = merge(local.common_labels, {
+      "resilient-orders.io/gateway-routes" = "allowed"
+    })
   }
 }
 
@@ -115,6 +119,38 @@ resource "helm_release" "external_secrets" {
   set {
     name  = "resources.limits.memory"
     value = "128Mi"
+  }
+  set {
+    name  = "webhook.resources.requests.cpu"
+    value = "10m"
+  }
+  set {
+    name  = "webhook.resources.requests.memory"
+    value = "32Mi"
+  }
+  set {
+    name  = "webhook.resources.limits.cpu"
+    value = "100m"
+  }
+  set {
+    name  = "webhook.resources.limits.memory"
+    value = "96Mi"
+  }
+  set {
+    name  = "certController.resources.requests.cpu"
+    value = "10m"
+  }
+  set {
+    name  = "certController.resources.requests.memory"
+    value = "32Mi"
+  }
+  set {
+    name  = "certController.resources.limits.cpu"
+    value = "100m"
+  }
+  set {
+    name  = "certController.resources.limits.memory"
+    value = "96Mi"
   }
 
   depends_on = [kubernetes_namespace_v1.external_secrets]
@@ -238,6 +274,14 @@ resource "helm_release" "argocd" {
     value = "false"
   }
   set {
+    name  = "applicationSet.enabled"
+    value = "false"
+  }
+  set {
+    name  = "notifications.enabled"
+    value = "false"
+  }
+  set {
     name  = "controller.resources.requests.cpu"
     value = "25m"
   }
@@ -272,6 +316,22 @@ resource "helm_release" "argocd" {
   set {
     name  = "repoServer.resources.limits.memory"
     value = "384Mi"
+  }
+  set {
+    name  = "redis.resources.requests.cpu"
+    value = "10m"
+  }
+  set {
+    name  = "redis.resources.requests.memory"
+    value = "32Mi"
+  }
+  set {
+    name  = "redis.resources.limits.cpu"
+    value = "100m"
+  }
+  set {
+    name  = "redis.resources.limits.memory"
+    value = "96Mi"
   }
 
   depends_on = [kubernetes_namespace_v1.argocd]

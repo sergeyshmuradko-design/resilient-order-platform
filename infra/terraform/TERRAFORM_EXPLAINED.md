@@ -61,8 +61,8 @@ handoff.
 - `local_env_file`: local-only path to `.env`, default `../../../.env`.
 - namespace variables: platform, application, external-secrets, argocd,
   strimzi and nginx-gateway.
-- feature flags: enable Strimzi, Gateway controller, local Vault seed, and Argo
-  CD Application creation.
+- feature flags: optionally enable Strimzi, keep Gateway controller enabled by
+  default, enable local Vault seed, and create the Argo CD Application.
 - chart version variables: pinned versions for reproducible installs.
 
 `platform/main.tf`
@@ -70,18 +70,22 @@ handoff.
 - `locals.common_labels`: common Kubernetes labels for Terraform-managed
   namespaces.
 - `kubernetes_namespace_v1.platform`: namespace for Vault/Postgres platform
-  resources.
+  resources; it also receives the Gateway route label for platform UI routes.
 - `kubernetes_namespace_v1.application`: namespace reserved for services; it
   also receives the Gateway route label.
 - `kubernetes_namespace_v1.external_secrets`: namespace for ESO.
-- `kubernetes_namespace_v1.argocd`: namespace for Argo CD.
+- `kubernetes_namespace_v1.argocd`: namespace for Argo CD; it receives the
+  Gateway route label so the Argo CD UI can be routed through the shared local
+  Gateway.
 - optional `strimzi` and `nginx_gateway` namespaces are created only when their
   feature flags are true.
 - `terraform_data.local_vault_token_secrets`: runs a shell helper that creates
   local bootstrap token Secrets without storing secret values in Terraform
   state.
 - `helm_release.external_secrets`: installs External Secrets Operator and CRDs.
-- `helm_release.strimzi`: installs Strimzi Kafka Operator.
+- `helm_release.strimzi`: optionally installs Strimzi Kafka Operator. It is
+  disabled in the default Codespaces slice and should be enabled when the Kafka
+  stage is being tested.
 - `terraform_data.gateway_api_crds`: applies Gateway API CRDs via `kubectl
   kustomize ... | kubectl apply -f -`.
 - `helm_release.nginx_gateway`: installs NGINX Gateway Fabric.

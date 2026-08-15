@@ -72,9 +72,22 @@ jobs:
         if: ${{ inputs.apply && !inputs.destroy }}
         run: terraform -chdir=infra/terraform/platform apply -auto-approve tfplan
 
-      - name: Pre-destroy Kubernetes cleanup
+      - name: Delete GitOps platform application
         if: ${{ inputs.destroy && inputs.apply }}
-        run: bash infra/terraform/scripts/pre-destroy-kubernetes-cleanup.sh
+        run: |
+          if kubectl get application resilient-orders-platform -n argocd >/dev/null 2>&1; then
+            kubectl patch application resilient-orders-platform \
+              -n argocd \
+              --type merge \
+              --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
+
+            kubectl delete application resilient-orders-platform \
+              -n argocd \
+              --wait=true \
+              --timeout=180s
+          else
+            echo "Argo CD Application resilient-orders-platform is already absent."
+          fi
 
       - name: Platform Terraform destroy
         if: ${{ inputs.destroy && inputs.apply }}

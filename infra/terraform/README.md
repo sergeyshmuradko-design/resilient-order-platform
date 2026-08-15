@@ -48,8 +48,9 @@ infra/helm/admin
 infra/helm/admin/values-postgres-only.yaml
 ```
 
-That means the first verification slice is intentionally small: Vault,
-ExternalSecret and PostgreSQL.
+That means the first verification slice is intentionally small: Gateway API,
+Vault, ExternalSecret and PostgreSQL. Messaging operators and brokers stay out
+of the default slice until they are explicitly enabled.
 
 ## Cloud Migration Notes
 
@@ -93,6 +94,12 @@ cluster. The Codespaces layer uses a `terraform_data` destroy provisioner to run
 ```bash
 k3d cluster delete resilient-orders || true
 ```
+
+The GitHub Actions workflow performs one extra GitOps ordering step before the
+platform destroy: it deletes the `resilient-orders-platform` Argo CD
+Application with the standard Argo CD cascade finalizer while Argo CD is still
+running. That lets Argo CD prune the resources it owns before Terraform removes
+operators and namespaces.
 
 If Terraform state is unavailable, run the same fallback manually:
 

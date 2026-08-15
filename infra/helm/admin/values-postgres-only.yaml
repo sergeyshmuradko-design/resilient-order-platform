@@ -26,7 +26,10 @@ database:
     enabled: false
 
 gateway:
-  enabled: false
+  enabled: true
+  routes:
+    argocd:
+      enabled: true
 
 components:
   vault:

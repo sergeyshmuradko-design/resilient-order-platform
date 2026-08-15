@@ -65,9 +65,9 @@ variable "nginx_gateway_namespace" {
 }
 
 variable "enable_strimzi" {
-  description = "Install Strimzi now, even though the first GitOps slice only reconciles PostgreSQL."
+  description = "Install Strimzi Kafka Operator. Keep it disabled in the default Codespaces slice until Kafka is tested."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_gateway_controller" {

@@ -6,11 +6,13 @@ It installs the GitOps bootstrap platform:
 
 - namespaces;
 - External Secrets Operator;
-- Strimzi Kafka Operator;
 - Gateway API CRDs and NGINX Gateway Fabric;
 - Argo CD;
 - the first Argo CD Application for `infra/helm/admin`;
 - local Vault bootstrap/seed helpers for Codespaces.
+
+Strimzi Kafka Operator is supported by this layer, but disabled by default in
+Codespaces to keep the first bootstrap slice small.
 
 ## Codespaces Apply
 
@@ -40,16 +42,16 @@ kubectl get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d
 ```
 
-Open a local tunnel:
+The local k3d cluster publishes one Gateway port through:
 
 ```bash
-kubectl port-forward -n argocd svc/argo-cd-argocd-server 8088:80
+--port '8080:80@loadbalancer'
 ```
 
-Then open:
+If the platform was applied with the default Gateway controller enabled, open:
 
 ```text
-http://localhost:8088
+http://argocd.localhost:8080
 ```
 
 Login:
@@ -57,6 +59,19 @@ Login:
 ```text
 username: admin
 password: value from argocd-initial-admin-secret
+```
+
+The same Gateway endpoint exposes local Vault UI:
+
+```text
+http://vault.localhost:8080
+```
+
+Use port-forward only if the cluster was created without the k3d
+`8080:80@loadbalancer` mapping:
+
+```bash
+kubectl port-forward -n argocd svc/argo-cd-argocd-server 8088:80
 ```
 
 ## Destroy

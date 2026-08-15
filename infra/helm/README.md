@@ -55,8 +55,8 @@ The default `values.yaml` is the dev profile. Additional values files are
 overlays for one concern only, such as load testing or monitoring.
 
 `infra/helm/admin/values-postgres-only.yaml` is the first GitOps profile. It
-keeps only Vault, ExternalSecret and PostgreSQL enabled so the bootstrap can be
-tested without the full application stack.
+keeps Gateway, Vault, ExternalSecret and PostgreSQL enabled so the bootstrap can
+be tested without the full application stack or messaging operators.
 
 ## Ownership model
 
@@ -132,6 +132,8 @@ The local Gateway profile keeps application Services internal and exposes them
 through one Gateway controller endpoint. Open:
 
 - http://order.localhost:8080
+- http://argocd.localhost:8080
+- http://vault.localhost:8080
 - http://grafana.localhost:8080
 - http://prometheus.localhost:8080
 

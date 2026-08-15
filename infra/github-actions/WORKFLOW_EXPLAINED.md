@@ -247,16 +247,30 @@ environment variables become Terraform variables:
 Applies the saved platform plan after the k3d cluster exists.
 
 ```yaml
-- name: Pre-destroy Kubernetes cleanup
+- name: Delete GitOps platform application
   if: ${{ inputs.destroy && inputs.apply }}
-  run: bash infra/terraform/scripts/pre-destroy-kubernetes-cleanup.sh
+  run: |
+    if kubectl get application resilient-orders-platform -n argocd >/dev/null 2>&1; then
+      kubectl patch application resilient-orders-platform \
+        -n argocd \
+        --type merge \
+        --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
+
+      kubectl delete application resilient-orders-platform \
+        -n argocd \
+        --wait=true \
+        --timeout=180s
+    else
+      echo "Argo CD Application resilient-orders-platform is already absent."
+    fi
 ```
 
-Runs only for explicit destroy runs. It removes known local GitOps/operator
-finalizers from Argo CD and External Secrets custom resources before Terraform
-starts deleting Helm releases and namespaces. This prevents a local namespace
-from getting stuck in `Terminating` after its controller has already been
-removed.
+Runs only for explicit destroy runs. This is the GitOps destroy ordering step:
+Argo CD owns the resources rendered from `infra/helm/admin`, so the workflow
+first adds the standard Argo CD cascade finalizer and deletes the Application.
+Argo CD then prunes its managed resources while its controller is still running.
+Only after that does Terraform remove platform Helm releases, operators and
+namespaces.
 
 ```yaml
 - name: Platform Terraform destroy
@@ -267,8 +281,9 @@ removed.
   run: terraform -chdir=infra/terraform/platform destroy -auto-approve
 ```
 
-Destroys the platform layer first. This removes Helm releases, namespaces and
-GitOps bootstrap resources before the Kubernetes cluster disappears.
+Destroys the platform layer after the GitOps Application has been pruned. This
+removes Helm releases, namespaces and bootstrap controllers before the
+Kubernetes cluster disappears.
 
 ```yaml
 - name: Codespaces Terraform destroy
