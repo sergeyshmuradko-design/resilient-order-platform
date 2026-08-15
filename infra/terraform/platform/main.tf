@@ -349,16 +349,16 @@ resource "helm_release" "argocd_image_updater" {
   wait    = true
   timeout = 180
 
-  # The updater is intentionally scoped to the single application release used
-  # in this demo and checks the registry slowly. In production this same chart
-  # can watch more Applications, but local Codespaces runs should stay quiet.
+  # The updater watches Argo CD Applications in its own namespace. Only
+  # Applications with argocd-image-updater annotations are eligible for image
+  # updates, so the platform Application stays untouched. The registry polling
+  # interval and concurrency are kept low for Codespaces.
   set_list {
     name = "extraArgs"
     value = [
       "--interval=10m",
       "--max-concurrent-apps=1",
-      "--max-concurrent-reconciles=1",
-      "--match-application-name=resilient-orders-app"
+      "--max-concurrent-reconciles=1"
     ]
   }
   set {
