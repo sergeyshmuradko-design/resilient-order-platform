@@ -14,8 +14,32 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
+  authorize-admin:
+    name: Authorize repository admin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check actor repository permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          permission="$(gh api "repos/${REPOSITORY}/collaborators/${ACTOR}/permission" --jq .permission)"
+
+          if [ "$permission" != "admin" ]; then
+            echo "::error::${ACTOR} has '${permission}' permission, but this Terraform workflow requires repository admin permission."
+            exit 1
+          fi
+
+          echo "${ACTOR} is authorized with repository admin permission."
+
   terraform:
+    needs: authorize-admin
     # This workflow is intentionally bound to a self-hosted runner. GitHub-hosted
     # runners cannot reach open Codespaces Docker daemon/kubeconfig.
     runs-on: [self-hosted, codespaces, k3d, resilient-orders]
