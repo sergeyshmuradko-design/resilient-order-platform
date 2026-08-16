@@ -1,17 +1,6 @@
 name: Service CI/CD
 
 on:
-  workflow_dispatch:
-    inputs:
-      service:
-        description: "Service to build and publish"
-        required: true
-        default: payment-service
-        type: choice
-        options:
-          - payment-service
-          - order-service
-          - notification-service
   push:
     branches:
       - main
@@ -21,7 +10,6 @@ on:
       - "settings.gradle"
       - "gradle/**"
       - "gradlew"
-      - ".github/workflows/service-cicd.yml"
 
 permissions:
   contents: read
@@ -71,43 +59,39 @@ jobs:
             selected_services=("${known_services[@]}")
           }
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            add_service "${{ inputs.service }}"
+          before="${{ github.event.before }}"
+
+          if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
+            before="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+
+          if [[ -n "$before" ]]; then
+            changed_files="$(git diff --name-only "$before" "${{ github.sha }}")"
           else
-            before="${{ github.event.before }}"
+            changed_files="$(git diff --name-only HEAD^ HEAD)"
+          fi
 
-            if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
-              before="$(git rev-parse HEAD^ 2>/dev/null || true)"
-            fi
+          shared_change=false
 
-            if [[ -n "$before" ]]; then
-              changed_files="$(git diff --name-only "$before" "${{ github.sha }}")"
-            else
-              changed_files="$(git diff --name-only HEAD^ HEAD)"
-            fi
+          while IFS= read -r file; do
+            case "$file" in
+              services/payment-service/*)
+                add_service payment-service
+                ;;
+              services/order-service/*)
+                add_service order-service
+                ;;
+              services/notification-service/*)
+                add_service notification-service
+                ;;
+              build.gradle|settings.gradle|gradle/*|gradlew)
+                shared_change=true
+                ;;
+            esac
+          done <<< "$changed_files"
 
-            shared_change=false
-
-            while IFS= read -r file; do
-              case "$file" in
-                services/payment-service/*)
-                  add_service payment-service
-                  ;;
-                services/order-service/*)
-                  add_service order-service
-                  ;;
-                services/notification-service/*)
-                  add_service notification-service
-                  ;;
-                build.gradle|settings.gradle|gradle/*|gradlew|.github/workflows/service-cicd.yml)
-                  shared_change=true
-                  ;;
-              esac
-            done <<< "$changed_files"
-
-            if [[ "$shared_change" == "true" ]]; then
-              add_all_services
-            fi
+          if [[ "$shared_change" == "true" ]]; then
+            add_all_services
           fi
 
           if [[ "${#selected_services[@]}" -eq 0 ]]; then

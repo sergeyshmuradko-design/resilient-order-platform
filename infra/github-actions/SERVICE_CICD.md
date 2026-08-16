@@ -5,8 +5,7 @@ This workflow is the service build and image publishing layer.
 The flow is intentionally GitOps-friendly:
 
 1. A pull request is merged into `main`.
-2. GitHub Actions detects which service changed, or you choose a service
-   manually through `workflow_dispatch`.
+2. GitHub Actions detects which service changed.
 3. The workflow runs the Gradle test and `bootJar` tasks for that service.
 4. The workflow builds a Docker image from `services/<service>/Dockerfile`.
 5. The image is pushed to GitHub Container Registry with:
@@ -25,20 +24,17 @@ digest promotion inside Argo CD.
 .github/workflows/service-cicd.yml
 ```
 
-Run manually:
-
-```text
-GitHub -> Actions -> Service CI/CD -> Run workflow -> service
-```
-
-Automatic run:
+Run:
 
 ```text
 merge pull request -> main
 ```
 
+Manual `workflow_dispatch` is intentionally disabled. Service images should be
+published by reviewed changes merged into `main`, not by an ad hoc button run.
+
 On `main`, service-specific changes build only that service. Shared Gradle or
-workflow changes build all known services:
+wrapper changes build all known services:
 
 ```text
 payment-service
@@ -164,11 +160,8 @@ apply = true
 destroy = false
 ```
 
-3. Run service CI/CD:
-
-```text
-GitHub -> Actions -> Service CI/CD -> Run workflow -> payment-service
-```
+3. Merge a PR that changes `services/payment-service/**` or another tracked
+   service path. GitHub then starts `Service CI/CD` automatically.
 
 4. Watch Argo CD:
 
