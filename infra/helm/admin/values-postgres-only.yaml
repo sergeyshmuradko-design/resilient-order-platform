@@ -1,8 +1,9 @@
 # GitOps bootstrap profile.
 #
 # This is the first small slice that Argo CD reconciles while the project is
-# moving from Docker Compose to Kubernetes. It keeps Vault + PostgreSQL inside
-# the cluster and disables the heavier broker/observability/application pieces.
+# moving from Docker Compose to Kubernetes. It keeps Vault, PostgreSQL, Redis
+# and RabbitMQ inside the cluster while Kafka, observability and application
+# workloads stay disabled for now.
 
 guardrails:
   quota:
@@ -45,9 +46,26 @@ components:
         cpu: 200m
         memory: 192Mi
   redis:
-    enabled: false
+    enabled: true
+    maxmemory: 16mb
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
   rabbitmq:
-    enabled: false
+    enabled: true
+    storage: 256Mi
+    diskFreeLimitBytes: "67108864"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
   kafka:
     enabled: false
   schemaRegistry:
