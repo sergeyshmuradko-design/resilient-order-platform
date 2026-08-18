@@ -53,6 +53,16 @@ fi
 mkdir -p "${runner_dir}"
 cd "${runner_dir}"
 
+if [ -d "bin.${runner_version}" ] && [ ! -x ./bin/Runner.Listener ]; then
+  echo "Repairing runner bin symlink for version ${runner_version}"
+  ln -sfn "${runner_dir}/bin.${runner_version}" ./bin
+fi
+
+if [ -d "externals.${runner_version}" ] && [ ! -e ./externals/node20/bin/node ]; then
+  echo "Repairing runner externals symlink for version ${runner_version}"
+  ln -sfn "${runner_dir}/externals.${runner_version}" ./externals
+fi
+
 if [ ! -x ./config.sh ]; then
   archive="actions-runner-linux-x64-${runner_version}.tar.gz"
   curl -fsSLO "https://github.com/actions/runner/releases/download/v${runner_version}/${archive}"

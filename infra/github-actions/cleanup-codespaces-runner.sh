@@ -10,10 +10,21 @@ if [ -z "${repo}" ] && command -v gh >/dev/null 2>&1; then
 fi
 
 runner_dir="${RUNNER_DIR:-${PWD}/.local/github-runner}"
+runner_version="${RUNNER_VERSION:-2.334.0}"
 
 if [ ! -x "${runner_dir}/config.sh" ]; then
   echo "Runner is not configured at ${runner_dir}."
   exit 0
+fi
+
+if [ -d "${runner_dir}/bin.${runner_version}" ] && [ ! -x "${runner_dir}/bin/Runner.Listener" ]; then
+  echo "Repairing runner bin symlink for version ${runner_version}"
+  ln -sfn "${runner_dir}/bin.${runner_version}" "${runner_dir}/bin"
+fi
+
+if [ -d "${runner_dir}/externals.${runner_version}" ] && [ ! -e "${runner_dir}/externals/node20/bin/node" ]; then
+  echo "Repairing runner externals symlink for version ${runner_version}"
+  ln -sfn "${runner_dir}/externals.${runner_version}" "${runner_dir}/externals"
 fi
 
 token="${RUNNER_REMOVE_TOKEN:-}"

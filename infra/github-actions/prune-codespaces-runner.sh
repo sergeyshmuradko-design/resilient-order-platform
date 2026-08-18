@@ -32,6 +32,14 @@ find "${runner_dir}" -maxdepth 1 -type d \
   ! -name "externals.${runner_version}" \
   -exec rm -rf {} +
 
+if [ -d "${runner_dir}/bin.${runner_version}" ]; then
+  ln -sfn "${runner_dir}/bin.${runner_version}" "${runner_dir}/bin"
+fi
+
+if [ -d "${runner_dir}/externals.${runner_version}" ]; then
+  ln -sfn "${runner_dir}/externals.${runner_version}" "${runner_dir}/externals"
+fi
+
 rm -f "${runner_dir}/.destroy-succeeded"
 
 echo "Runner prune completed."
