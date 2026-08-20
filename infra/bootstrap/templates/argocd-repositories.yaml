@@ -1,0 +1,32 @@
+# Public OCI Helm repositories used by child Applications.
+#
+# Argo CD can render Helm charts from OCI registries, but repository entries
+# make that support explicit. These entries do not contain credentials; they
+# only tell repo-server that the URL should be treated as a Helm OCI registry.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nginx-gateway-fabric-oci-repository
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  name: nginx-gateway-fabric
+  type: helm
+  enableOCI: "true"
+  url: ghcr.io/nginx/charts
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: strimzi-oci-repository
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  name: strimzi
+  type: helm
+  enableOCI: "true"
+  url: quay.io/strimzi-helm

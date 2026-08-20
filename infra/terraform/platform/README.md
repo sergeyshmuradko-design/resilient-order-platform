@@ -4,17 +4,20 @@ This layer assumes Kubernetes already exists and `kubeconfig` points to it.
 
 It installs the GitOps bootstrap platform:
 
-- namespaces;
-- External Secrets Operator;
-- Gateway API CRDs and NGINX Gateway Fabric;
 - Argo CD;
-- Argo CD Image Updater;
-- the first Argo CD Application for `infra/helm/admin`;
-- the first service-level Argo CD Application for `infra/helm/app`;
-- local Vault bootstrap/seed helpers for Codespaces.
+- the GitOps bootstrap Helm release that creates the root Argo CD Application
+  for `infra/root`;
+- the Infisical Universal Auth settings passed into the GitOps bootstrap.
 
-Strimzi Kafka Operator is supported by this layer, but disabled by default in
-Codespaces to keep the first bootstrap slice small.
+External Secrets Operator, Gateway API CRDs, NGINX Gateway Fabric, RabbitMQ
+operators and optional Strimzi are now Argo CD Applications rendered from
+`infra/root`. Terraform passes their versions/feature flags into the root chart
+but does not manage them as individual Terraform resources.
+
+RabbitMQ operators are enabled by default because `infra/platform-runtime`
+declares a `RabbitmqCluster` and `infra/services` declares RabbitMQ topology
+custom resources. Strimzi remains disabled by default to keep the first
+Codespaces slice small.
 
 ## Codespaces Apply
 
@@ -27,15 +30,14 @@ terraform -chdir=infra/terraform/platform apply \
   -var="repository_url=https://github.com/OWNER/REPOSITORY.git"
 ```
 
-The local Vault seed helper waits for Argo CD to create `deployment/vault` and
-then waits for that Deployment to become available before writing `.env` values
-into Vault.
+External Secrets Operator reads application/runtime secrets from Infisical.
+The platform-system chart creates `infisical-universal-auth` with the Client
+ID/Secret provided by GitHub Actions secrets. The actual
+PostgreSQL/RabbitMQ/Grafana/application passwords stay in Infisical.
 
-The app Application uses `infra/helm/app/values-payment-service-gitops.yaml`.
-It enables `payment-service` and points the Deployment at the GHCR `:main` tag.
-The service CI/CD workflow publishes the image, and Argo CD Image Updater
-updates the live Argo CD Application to the newest digest without committing
-image changes back to Git.
+The services Application currently uses `infra/services/values.yaml`. It
+enables `payment-service`. The `payment-service` workflow publishes the image
+and commits the updated `components.paymentService.image` value to Git.
 
 ## Argo CD UI
 
@@ -69,12 +71,6 @@ username: admin
 password: value from argocd-initial-admin-secret
 ```
 
-The same Gateway endpoint exposes local Vault UI:
-
-```text
-http://vault.localhost:8080
-```
-
 Use port-forward only if the cluster was created without the k3d
 `8080:80@loadbalancer` mapping:
 
@@ -92,5 +88,5 @@ terraform -chdir=infra/terraform/platform destroy \
 terraform -chdir=infra/terraform/codespaces destroy
 ```
 
-This removes Helm releases, Terraform-managed namespaces, Argo CD bootstrap
-resources and then the local k3d cluster.
+This removes the GitOps bootstrap release while Argo CD is still running, then
+removes Argo CD and finally the local k3d cluster.

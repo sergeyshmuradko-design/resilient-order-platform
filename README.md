@@ -29,7 +29,9 @@
 - [Performance Tests](performance-tests/README.md)
 - [Eclipse Memory Analyzer](infra/mat/README.md)
 - [Grafana Dashboards and Provisioning](infra/grafana/README.md)
-- [Helm / Kubernetes](infra/helm/README.md)
+- [Kubernetes Ownership Map](infra/KUBERNETES_OWNERSHIP.md)
+- [GitOps Bootstrap Helm Chart](infra/bootstrap/README.md)
+- [Kubernetes GitOps Root](infra/root/README.md)
 - [Terraform GitOps Bootstrap](infra/terraform/README.md)
 - [Codespaces GitHub Actions Runner](infra/github-actions/README.md)
 
@@ -66,11 +68,10 @@ k3d image import \
 ### Start with GitOps
 
 The GitOps path starts from Terraform. Terraform prepares the local Kubernetes
-bootstrap layer, installs platform controllers, installs Argo CD, and then Argo
-CD reconciles the first Helm slice from Git.
+cluster, installs Argo CD, installs one GitOps bootstrap release, and then Argo
+CD reconciles platform operators and workloads from Git.
 
 ```bash
-cp .env.example .env
 make terraform-init
 make terraform-plan
 make terraform-apply
@@ -82,12 +83,11 @@ The first GitOps slice is deliberately small:
 - External Secrets Operator
 - Strimzi Kafka Operator
 - Gateway API CRDs and NGINX Gateway Fabric
-- local HashiCorp Vault
 - PostgreSQL
 
-Only Vault and PostgreSQL are reconciled as platform workloads for the first
-verification pass. RabbitMQ, Kafka, Schema Registry, services and observability
-stay in Helm values for later stages.
+PostgreSQL is reconciled as the first platform workload. Secrets are read from
+Infisical through External Secrets Operator. RabbitMQ, Kafka, Schema Registry,
+services and observability stay in Helm values for later stages.
 
 ### Start from GitHub Actions
 
@@ -104,12 +104,11 @@ make github-runner-start
 Then run the manual workflow in GitHub:
 
 ```text
-Actions -> GitOps Bootstrap Codespaces -> Run workflow
+Actions -> Codespaces Cluster Setup -> Run workflow
 ```
 
-Use `apply=false, destroy=false` for a plan, `apply=true, destroy=false` to
-create/update, and `apply=true, destroy=true` to remove platform resources and
-delete the local k3d cluster.
+Use `mode=plan` for a plan, `mode=apply` to create/update, and `mode=destroy`
+to remove platform resources and delete the local k3d cluster.
 
 The runner waits for the workflow job. Terraform does not start automatically
 when the runner starts.
@@ -157,7 +156,6 @@ control-plane components. For a local k3d/k3s demo, expect approximately:
 
 - Kubernetes/k3d baseline: 300-700 MB RAM
 - External Secrets Operator: 50-150 MB RAM
-- local HashiCorp Vault dev server: roughly 100-200 MB RAM under the configured limits
 - Strimzi Operator: roughly 100-300 MB RAM under the configured limits
 - NGINX Gateway Fabric: roughly 100-250 MB RAM under the configured limits
 - application stack without monitoring: roughly 1.8-3.0 GB RAM under the current limits

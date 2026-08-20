@@ -1,14 +1,30 @@
 # GitOps Bootstrap Workflow Explained
 
-This document explains `.github/workflows/gitops-bootstrap-codespaces.yml`.
+This document explains `.github/workflows/codespaces-cluster-setup.yml`.
 
 ## Quick Reminder
 
 1. Open Codespaces.
-2. Make sure `.env` exists:
+2. Make sure the repository has Infisical settings in GitHub Actions:
 
-```bash
-cp .env.example .env
+```text
+Repository -> Settings -> Secrets and variables -> Actions
+```
+
+Required secrets:
+
+```text
+INFISICAL_UNIVERSAL_AUTH_CLIENT_ID
+INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET
+```
+
+Required variables:
+
+```text
+INFISICAL_HOST_API
+INFISICAL_PROJECT_SLUG
+INFISICAL_ENVIRONMENT_SLUG
+INFISICAL_SECRETS_PATH
 ```
 
 3. Start the self-hosted runner in a dedicated terminal:
@@ -21,14 +37,13 @@ make github-runner-start
 4. Open GitHub:
 
 ```text
-Repository -> Actions -> GitOps Bootstrap Codespaces -> Run workflow
+Repository -> Actions -> Codespaces Cluster Setup -> Run workflow
 ```
 
 5. First run:
 
 ```text
-apply = false
-destroy = false
+mode = plan
 ```
 
 This runs `plan` only.
@@ -39,8 +54,7 @@ because the `platform` layer needs a reachable Kubernetes context.
 6. Create/update:
 
 ```text
-apply = true
-destroy = false
+mode = apply
 ```
 
 This applies `codespaces` first and `platform` second.
@@ -48,8 +62,7 @@ This applies `codespaces` first and `platform` second.
 7. Return to the pre-cluster state:
 
 ```text
-apply = true
-destroy = true
+mode = destroy
 ```
 
 This destroys `platform` first and `codespaces` second. The Codespaces destroy
@@ -76,7 +89,7 @@ Flow:
 ## Line-by-Line Explanation
 
 ```yaml
-name: GitOps Bootstrap Codespaces
+name: Codespaces Cluster Setup
 ```
 
 Human-readable workflow name in GitHub Actions UI.
@@ -97,25 +110,20 @@ inputs:
 Defines the form fields shown by `Run workflow`.
 
 ```yaml
-apply:
-  description: "Apply Terraform changes instead of only planning."
+mode:
+  description: "Choose whether to plan, apply or destroy the local Codespaces cluster setup."
   required: true
-  type: boolean
-  default: false
+  type: choice
+  default: plan
+  options:
+    - plan
+    - apply
+    - destroy
 ```
 
-Boolean input. `false` means plan only. `true` allows apply or destroy.
-
-```yaml
-destroy:
-  description: "Destroy platform first and then delete the local k3d cluster."
-  required: true
-  type: boolean
-  default: false
-```
-
-Boolean input. When `destroy=true` and `apply=true`, the workflow destroys
-Terraform-managed resources instead of creating/updating them.
+Single choice input. `plan` only plans the local k3d layer, `apply` creates or
+updates the local cluster and platform layer, and `destroy` removes platform
+resources before deleting the local k3d cluster.
 
 ```yaml
 jobs:
@@ -209,88 +217,67 @@ Validates the platform layer syntax.
 
 ```yaml
 - name: Codespaces Terraform plan
-  if: ${{ !inputs.destroy }}
+  if: ${{ inputs.mode == 'plan' || inputs.mode == 'apply' }}
   run: terraform -chdir=infra/terraform/codespaces plan -out=tfplan
 ```
 
-Plans k3d cluster creation/reuse only when not destroying.
+Plans k3d cluster creation/reuse for `plan` and `apply` modes.
 
 ```yaml
 - name: Codespaces Terraform apply
-  if: ${{ inputs.apply && !inputs.destroy }}
+  if: ${{ inputs.mode == 'apply' }}
   run: terraform -chdir=infra/terraform/codespaces apply -auto-approve tfplan
 ```
 
-Applies the saved k3d plan only when `apply=true` and `destroy=false`.
+Applies the saved k3d plan only in `apply` mode.
 
 ```yaml
 - name: Platform Terraform plan
-  if: ${{ !inputs.destroy }}
+  if: ${{ inputs.mode == 'apply' }}
   env:
     TF_VAR_repository_url: ${{ github.server_url }}/${{ github.repository }}.git
     TF_VAR_target_revision: ${{ github.ref_name }}
   run: terraform -chdir=infra/terraform/platform plan -out=tfplan
 ```
 
-Plans platform resources after the k3d cluster has been applied. The `TF_VAR_*`
-environment variables become Terraform variables:
+Plans platform resources after the k3d cluster has been applied. This is skipped
+in pure `plan` mode because a fresh Codespaces run may not have a reachable
+cluster yet. The `TF_VAR_*` environment variables become Terraform variables:
 
 - `repository_url`: Git repo URL for Argo CD;
 - `target_revision`: branch/tag for Argo CD.
 
 ```yaml
 - name: Platform Terraform apply
-  if: ${{ inputs.apply && !inputs.destroy }}
+  if: ${{ inputs.mode == 'apply' }}
   run: terraform -chdir=infra/terraform/platform apply -auto-approve tfplan
 ```
 
 Applies the saved platform plan after the k3d cluster exists.
 
-```yaml
-- name: Delete GitOps applications
-  if: ${{ inputs.destroy && inputs.apply }}
-  run: |
-    for app in resilient-orders-app resilient-orders-platform; do
-      if kubectl get application "$app" -n argocd >/dev/null 2>&1; then
-        kubectl patch application "$app" \
-          -n argocd \
-          --type merge \
-          --patch '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
-
-        kubectl delete application "$app" \
-          -n argocd \
-          --wait=true \
-          --timeout=180s
-      else
-        echo "Argo CD Application $app is already absent."
-      fi
-    done
-```
-
-Runs only for explicit destroy runs. This is the GitOps destroy ordering step:
-Argo CD owns the resources rendered from `infra/helm/app` and
-`infra/helm/admin`, so the workflow first deletes the application chart
-Application, then the platform chart Application. The standard Argo CD cascade
-finalizer lets Argo CD prune managed resources while its controller is still
-running. Only after that does Terraform remove platform Helm releases,
-operators and namespaces.
+The old workflow used an explicit `kubectl delete application` step here. The
+current flow does not need it: Terraform manages the GitOps handoff as the
+`resilient-orders-bootstrap` Helm release. During destroy, Terraform uninstalls
+that bootstrap release before uninstalling Argo CD, so Argo CD can process the
+root Application finalizer and prune child Applications while its controller is
+still running.
 
 ```yaml
 - name: Platform Terraform destroy
-  if: ${{ inputs.destroy && inputs.apply }}
+  if: ${{ inputs.mode == 'destroy' }}
   env:
     TF_VAR_repository_url: ${{ github.server_url }}/${{ github.repository }}.git
     TF_VAR_target_revision: ${{ github.ref_name }}
   run: terraform -chdir=infra/terraform/platform destroy -auto-approve
 ```
 
-Destroys the platform layer after the GitOps Application has been pruned. This
-removes Helm releases, namespaces and bootstrap controllers before the
-Kubernetes cluster disappears.
+Destroys the platform layer. Terraform removes the bootstrap Helm release first,
+then removes Argo CD, operators, namespaces and other platform resources before
+the Kubernetes cluster disappears.
 
 ```yaml
 - name: Codespaces Terraform destroy
-  if: ${{ inputs.destroy && inputs.apply }}
+  if: ${{ inputs.mode == 'destroy' }}
   run: terraform -chdir=infra/terraform/codespaces destroy -auto-approve
 ```
 
@@ -299,7 +286,7 @@ provisioner deletes the k3d cluster.
 
 ```yaml
 - name: Mark local runner workspace for pruning
-  if: ${{ inputs.destroy && inputs.apply && success() }}
+  if: ${{ inputs.mode == 'destroy' && success() }}
   run: |
     mkdir -p "$RUNNER_DIR"
     touch "$RUNNER_DIR/.destroy-succeeded"
@@ -315,28 +302,23 @@ post-steps may still be running.
 Plan local cluster only:
 
 ```text
-apply=false
-destroy=false
+mode=plan
 ```
 
-Full platform planning requires a created cluster. Use `apply=true,
-destroy=false` for the first end-to-end bootstrap run.
+Full platform planning requires a created cluster. Use `mode=apply` for the
+first end-to-end bootstrap run.
 
 Create/update:
 
 ```text
-apply=true
-destroy=false
+mode=apply
 ```
 
 Destroy everything managed by Terraform:
 
 ```text
-apply=true
-destroy=true
+mode=destroy
 ```
-
-`destroy=true, apply=false` is intentionally a no-op after validation/init.
 
 ## Common Mistakes
 

@@ -1,0 +1,156 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .Values.operators.project | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
+spec:
+  description: Admin-owned platform operators and CRDs required before runtime charts sync.
+  sourceRepos:
+    - {{ .Values.operators.externalSecrets.repoURL | quote }}
+    - {{ .Values.operators.rabbitmq.repoURL | quote }}
+    - {{ .Values.operators.gatewayApiCrds.repoURL | quote }}
+    - {{ .Values.operators.nginxGateway.repoURL | quote }}
+    - {{ .Values.operators.strimzi.repoURL | quote }}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.externalSecrets | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.rabbitmqOperator | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.nginxGateway | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.strimzi | quote }}
+  clusterResourceWhitelist:
+    # Third-party operator charts own CRDs, ClusterRoles, webhooks and
+    # GatewayClass-like cluster resources. The broad cluster whitelist is scoped
+    # to reviewed admin-owned chart repositories, not to application teams.
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: resilient-orders-platform-system
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+spec:
+  description: Platform system controllers, secret plumbing and shared entry points.
+  sourceRepos:
+    - {{ .Values.repositoryUrl | quote }}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.platform | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.application | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.argocd | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.externalSecrets | quote }}
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: external-secrets.io
+      kind: ClusterSecretStore
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: LimitRange
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: Secret
+    - group: apps
+      kind: Deployment
+    - group: external-secrets.io
+      kind: ExternalSecret
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: resilient-orders-platform-runtime
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+spec:
+  description: Shared runtime infrastructure such as PostgreSQL, Redis and RabbitMQ.
+  sourceRepos:
+    - {{ .Values.repositoryUrl | quote }}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.platform | quote }}
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: batch
+      kind: Job
+    - group: rabbitmq.com
+      kind: RabbitmqCluster
+    - group: kafka.strimzi.io
+      kind: Kafka
+    - group: kafka.strimzi.io
+      kind: KafkaNodePool
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: resilient-orders-services
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+spec:
+  description: Application service workloads.
+  sourceRepos:
+    - {{ .Values.repositoryUrl | quote }}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.application | quote }}
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: Job
+    - group: external-secrets.io
+      kind: ExternalSecret
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+    - group: kafka.strimzi.io
+      kind: KafkaTopic
+    - group: rabbitmq.com
+      kind: User
+    - group: rabbitmq.com
+      kind: Permission
+    - group: rabbitmq.com
+      kind: Exchange
+    - group: rabbitmq.com
+      kind: Queue
+    - group: rabbitmq.com
+      kind: Binding
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding

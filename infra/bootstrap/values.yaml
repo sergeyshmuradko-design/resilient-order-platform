@@ -1,0 +1,49 @@
+repositoryUrl: ""
+targetRevision: main
+containerImagePrefix: ghcr.io/sergeyshmuradko-design/resilient-order-platform
+
+namespaces:
+  argocd: argocd
+  platform: resilient-orders-platform
+  application: resilient-orders
+  externalSecrets: external-secrets
+  rabbitmqOperator: rabbitmq-system
+  nginxGateway: nginx-gateway
+  strimzi: strimzi-system
+
+operators:
+  externalSecrets:
+    targetRevision: 2.8.0
+  rabbitmq:
+    targetRevision: 4.4.34
+  gatewayApiCrds:
+    targetRevision: v2.6.7
+  nginxGateway:
+    targetRevision: 2.6.7
+  strimzi:
+    enabled: false
+    targetRevision: 1.1.0
+
+secrets:
+  external:
+    storeName: infisical-cluster-store
+    infisical:
+      hostAPI: https://app.infisical.com
+      projectSlug: replace-me
+      environmentSlug: dev
+      secretsPath: /
+      clientId: replace-me
+      clientSecret: replace-me
+      authSecretName: infisical-universal-auth
+      authSecretNamespace: external-secrets
+
+root:
+  projectName: resilient-orders-root
+  applicationName: resilient-orders-root
+  releaseName: resilient-orders-root
+  path: infra/root
+
+sync:
+  automated:
+    prune: true
+    selfHeal: true

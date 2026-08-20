@@ -1,0 +1,59 @@
+{{- if .Values.serviceOwnerRbac.enabled }}
+# Optional RBAC boundary for a future real cluster with OIDC/SSO groups.
+#
+# Locally this RoleBinding is mostly documentation-as-code. In production it
+# should bind to the IdP group that owns application services. The Role allows
+# service owners to manage service-scoped messaging contracts in their namespace
+# without granting access to the platform namespace or RabbitMQ administrator
+# credentials.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: service-messaging-owner
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "service-messaging-owner" "component" "rbac") | nindent 4 }}
+rules:
+  - apiGroups:
+      - rabbitmq.com
+    resources:
+      - users
+      - permissions
+      - exchanges
+      - queues
+      - bindings
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: service-messaging-owner
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "service-messaging-owner" "component" "rbac") | nindent 4 }}
+subjects:
+  - kind: Group
+    name: {{ .Values.serviceOwnerRbac.groupName | quote }}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: service-messaging-owner
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

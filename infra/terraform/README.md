@@ -3,18 +3,16 @@
 Terraform is split into three layers:
 
 - `codespaces`: disposable local k3d cluster lifecycle;
-- `platform`: controllers, namespaces, Argo CD and the first GitOps
-  Application;
+- `platform`: Argo CD and the GitOps bootstrap Helm release;
 - `oracle`: placeholder for the future OCI VM/OKE/network layer.
 
-After Argo CD is installed, Kubernetes workloads should be reconciled from Git.
-That is the GitOps boundary: Terraform prepares the platform, Argo CD keeps the
-cluster equal to repository state.
+After Argo CD is installed, Kubernetes workloads and platform operators are
+reconciled from Git. That is the GitOps boundary: Terraform prepares the
+controller handoff, Argo CD keeps the cluster equal to repository state.
 
 ## Local Codespaces Flow
 
 ```bash
-cp .env.example .env
 make terraform-init
 make terraform-plan
 make terraform-apply
@@ -41,43 +39,45 @@ infra/terraform/codespaces
 infra/terraform/platform
 ```
 
-The initial Argo CD application uses:
+The initial Argo CD handoff is a small Helm release:
 
 ```text
-infra/helm/admin
-infra/helm/admin/values-postgres-only.yaml
+resilient-orders-bootstrap -> resilient-orders-root -> infra/root
 ```
 
-That means the first verification slice is intentionally small: Gateway API,
-Vault, ExternalSecret and PostgreSQL. Messaging operators and brokers stay out
-of the default slice until they are explicitly enabled.
-
-Terraform also creates the first service-level Application:
+The root Application owns child Applications and keeps deployment order in one
+place:
 
 ```text
-infra/helm/app
-infra/helm/app/values-payment-service-gitops.yaml
+resilient-orders-platform-system   -> infra/platform-system
+resilient-orders-platform-runtime  -> infra/platform-runtime
+resilient-orders-services          -> infra/services
 ```
 
-That Application enables the first lightweight service slice,
-`payment-service`. The `Service CI/CD` workflow publishes service images to
-GHCR. Argo CD Image Updater watches the `payment-service:main` image, resolves
-the newest digest and updates the live Argo CD Application without committing
-image tag changes back to Git.
+The child Applications use Argo CD sync waves only at the layer boundary:
+platform-system, platform-runtime and service workloads. Low-level Kubernetes
+objects such as StatefulSets and Services do not carry ordering annotations.
+
+The app layer enables the first lightweight service slice, `payment-service`.
+The `payment-service` workflow publishes the service image to GHCR and updates
+the GitOps image value in Git. Argo CD deploys that immutable image reference
+from repository state, not from a live Application mutation.
 
 ## Cloud Migration Notes
 
 For Oracle Cloud, replace only the cluster/runtime layer first:
 
 - `infra/terraform/codespaces` is replaced by `infra/terraform/oracle`;
-- `local_env_file`/local Vault seed becomes OCI Vault or another cloud secret
-  provider;
+- Infisical can later be replaced by OCI Vault or another cloud secret provider
+  behind the same External Secrets Operator contract;
 - `infra/terraform/platform`, Argo CD Application paths and Helm charts can
   stay the same.
 
-The current local Vault seed scripts avoid writing application passwords into
-`terraform.tfstate`. They are a Codespaces convenience, not a production secret
-management model.
+The current Codespaces bootstrap uses Infisical Universal Auth because
+Infisical Cloud cannot safely call the local k3d Kubernetes API for
+TokenReview. Application passwords stay in Infisical; the Universal Auth
+Client ID/Secret are stored only in GitHub Actions secrets and the local
+Terraform state used by the temporary self-hosted runner.
 
 ## Detailed Explanations
 
@@ -108,11 +108,10 @@ cluster. The Codespaces layer uses a `terraform_data` destroy provisioner to run
 k3d cluster delete resilient-orders || true
 ```
 
-The GitHub Actions workflow performs an extra GitOps ordering step before the
-platform destroy: it deletes the `resilient-orders-app` Application first and
-then `resilient-orders-platform`, both with the standard Argo CD cascade
-finalizer while Argo CD is still running. That lets Argo CD prune the resources
-it owns before Terraform removes operators and namespaces.
+Terraform destroys the GitOps bootstrap Helm release before it destroys Argo CD.
+That release owns the `resilient-orders-root` Application with the standard Argo
+CD cascade finalizer. While Argo CD is still running, it can prune child
+Applications and workloads before Terraform removes operators and namespaces.
 
 If Terraform state is unavailable, run the same fallback manually:
 
@@ -126,40 +125,21 @@ Self-hosted GitHub runner cleanup is separate from Terraform:
 make github-runner-cleanup
 ```
 
-## Why Not Put .env Secrets Into Vault Directly With Terraform?
+## Infisical Universal Auth For Codespaces
 
-Technically, we could make this shorter with the Vault provider:
+External Secrets Operator authenticates to Infisical with Universal Auth. The
+platform-system chart renders:
 
-```hcl
-provider "vault" {
-  address = "http://..."
-  token   = var.vault_token
-}
-
-resource "vault_kv_secret_v2" "platform" {
-  mount = "secret"
-  name  = "resilient-orders"
-  data_json = jsonencode({
-    POSTGRES_PASSWORD = var.postgres_password
-  })
-}
+```text
+Secret/infisical-universal-auth
+ClusterSecretStore/infisical-cluster-store
 ```
 
-But that has a serious downside: Terraform state would contain the secret
-values. Even when variables are marked `sensitive`, Terraform still needs the
-real values in state so it can compare and update resources later.
+The Secret contains only the Infisical Universal Auth Client ID/Secret, not
+PostgreSQL/RabbitMQ/Grafana/application passwords. This is acceptable for the
+temporary Codespaces/dev environment, but the local Terraform state should stay
+ignored and should not be copied into Git.
 
-The current local approach is a little more verbose, but safer for a public
-learning repository:
-
-- `.env` stays outside Git;
-- Terraform state does not store application passwords;
-- Kubernetes receives only the local Vault bootstrap token as a short local
-  convenience;
-- application passwords are written into Vault by a tiny shell script;
-- later, this script can be replaced by OCI Vault, HashiCorp Vault automation,
-  or a cloud secret manager without changing application manifests.
-
-So: the shortest Terraform-only solution exists, but the current split is the
-better default for this project because it avoids teaching the bad habit of
-putting real secret values into Terraform state.
+For a real cloud cluster, prefer Infisical Kubernetes Auth, OCI Auth or another
+cloud identity flow where Infisical can safely validate workload identity
+without exposing the Kubernetes API from Codespaces.

@@ -1,0 +1,129 @@
+{{- /*
+The root Application renders the three GitOps ownership groups.
+
+Sync waves are intentionally kept only at this boundary:
+- platform-system: shared config, Gateway and ExternalSecret plumbing;
+- platform-runtime: PostgreSQL, Redis, RabbitMQ and future shared runtime tools;
+- services: application workloads.
+
+Each child chart has exactly one values.yaml. Image promotion should open a pull
+request that updates that Git-owned values file instead of mutating the live
+Argo CD Application.
+*/ -}}
+{{- if .Values.layers.platformSystem.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.layers.platformSystem.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .Values.layers.platformSystem.wave | quote }}
+spec:
+  project: {{ .Values.layers.platformSystem.project | quote }}
+  source:
+    repoURL: {{ .Values.repositoryUrl | quote }}
+    targetRevision: {{ .Values.targetRevision | quote }}
+    path: {{ .Values.layers.platformSystem.path | quote }}
+    helm:
+      releaseName: {{ .Values.layers.platformSystem.releaseName | quote }}
+      parameters:
+        - name: secrets.external.storeName
+          value: {{ .Values.secrets.external.storeName | quote }}
+        - name: secrets.external.infisical.hostAPI
+          value: {{ .Values.secrets.external.infisical.hostAPI | quote }}
+        - name: secrets.external.infisical.projectSlug
+          value: {{ .Values.secrets.external.infisical.projectSlug | quote }}
+        - name: secrets.external.infisical.environmentSlug
+          value: {{ .Values.secrets.external.infisical.environmentSlug | quote }}
+        - name: secrets.external.infisical.secretsPath
+          value: {{ .Values.secrets.external.infisical.secretsPath | quote }}
+        - name: secrets.external.infisical.clientId
+          value: {{ .Values.secrets.external.infisical.clientId | quote }}
+        - name: secrets.external.infisical.clientSecret
+          value: {{ .Values.secrets.external.infisical.clientSecret | quote }}
+        - name: secrets.external.infisical.authSecretName
+          value: {{ .Values.secrets.external.infisical.authSecretName | quote }}
+        - name: secrets.external.infisical.authSecretNamespace
+          value: {{ .Values.secrets.external.infisical.authSecretNamespace | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespaces.platform | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.layers.platformRuntime.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.layers.platformRuntime.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .Values.layers.platformRuntime.wave | quote }}
+spec:
+  project: {{ .Values.layers.platformRuntime.project | quote }}
+  source:
+    repoURL: {{ .Values.repositoryUrl | quote }}
+    targetRevision: {{ .Values.targetRevision | quote }}
+    path: {{ .Values.layers.platformRuntime.path | quote }}
+    helm:
+      releaseName: {{ .Values.layers.platformRuntime.releaseName | quote }}
+      parameters:
+        - name: secrets.external.storeName
+          value: {{ .Values.secrets.external.storeName | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespaces.platform | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.layers.services.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.layers.services.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .Values.layers.services.wave | quote }}
+spec:
+  project: {{ .Values.layers.services.project | quote }}
+  source:
+    repoURL: {{ .Values.repositoryUrl | quote }}
+    targetRevision: {{ .Values.targetRevision | quote }}
+    path: {{ .Values.layers.services.path | quote }}
+    helm:
+      releaseName: {{ .Values.layers.services.releaseName | quote }}
+      parameters:
+        - name: secrets.external.storeName
+          value: {{ .Values.secrets.external.storeName | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespaces.application | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+{{- end }}

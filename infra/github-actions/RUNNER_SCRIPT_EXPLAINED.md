@@ -160,17 +160,8 @@ bootstrap workflow uses `RUNNER_DIR` to place a destroy-success marker outside
 the checkout, and the prune helper uses both values to remove old runner data.
 
 ```bash
-export TF_VAR_local_env_file="${TF_VAR_local_env_file:-${workspace_dir}/.env}"
-```
-
-Exports the Terraform variable used by the platform layer to find the local
-`.env` file. The workflow checkout does not contain `.env`, so the runner
-process passes the real Codespaces workspace path to Terraform.
-
-```bash
 echo "Repository: ${repo}"
 echo "Runner version: ${runner_version}"
-echo "Terraform local env file: ${TF_VAR_local_env_file}"
 ```
 
 Prints the important non-secret runtime settings before registration. This
