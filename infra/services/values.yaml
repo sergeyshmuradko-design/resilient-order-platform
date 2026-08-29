@@ -7,14 +7,11 @@
 
 nameOverride: ""
 fullnameOverride: ""
-
 labels:
   # Kubernetes recommended "app.kubernetes.io/part-of" value. It lets Argo CD,
   # kubectl and observability tools group every resource by the same product.
   partOf: resilient-order-platform
-
 imagePullSecrets: []
-
 platform:
   namespace: resilient-orders-platform
   postgresHost: postgres.resilient-orders-platform.svc.cluster.local
@@ -22,7 +19,6 @@ platform:
   redisHost: redis.resilient-orders-platform.svc.cluster.local
   schemaRegistryUrl: http://schema-registry.resilient-orders-platform.svc.cluster.local:8081
   jaegerOtlpHttpUrl: http://jaeger.resilient-orders-platform.svc.cluster.local:4318/v1/traces
-
 guardrails:
   enabled: true
   quota:
@@ -40,7 +36,6 @@ guardrails:
     defaultMemory: 256Mi
     maxCpu: 750m
     maxMemory: 512Mi
-
 config:
   postgresDb: orders_db
   postgresUser: orders_user
@@ -51,7 +46,6 @@ config:
   notificationServiceDbUser: notification_service_app
   rabbitmqHost: rabbitmq
   rabbitmqPort: "5672"
-
 exposure:
   # Default keeps Services internal. Browser/API access is handled by Gateway API
   # in local/prod-like profiles instead of exposing many LoadBalancer Services.
@@ -63,7 +57,6 @@ exposure:
   grafana:
     type: ClusterIP
     port: 3000
-
 routes:
   enabled: true
   gatewayName: platform-gateway
@@ -72,7 +65,6 @@ routes:
     paymentService: payment.localhost
     orderService: order.localhost
     notificationService: notification.localhost
-
 secrets:
   # Application namespace copies of secrets from the Infisical-backed
   # ClusterSecretStore. Runtime Pods and migration Jobs get different Kubernetes
@@ -100,14 +92,12 @@ secrets:
     keys:
       - ORDER_SERVICE_DB_OWNER_PASSWORD
       - NOTIFICATION_SERVICE_DB_OWNER_PASSWORD
-
 serviceOwnerRbac:
   enabled: true
   # Placeholder for a future OIDC/SSO group in the real cluster. Kubernetes
   # itself does not create this group; the API server receives it from the
   # identity provider configured for developers.
   groupName: resilient-orders:service-developers
-
 rabbitmqTopology:
   enabled: true
   clusterName: rabbitmq
@@ -189,7 +179,6 @@ rabbitmqTopology:
       destinationType: queue
       routingKey: order.created.dlq
       arguments: {}
-
 components:
   postgres:
     enabled: false
@@ -292,7 +281,7 @@ components:
     # Pin services by immutable image digest. Mutable tags such as main/latest
     # are convenient locally, but production-style GitOps should deploy an exact
     # artifact so rollback and audit both point to a real image.
-    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/payment-service@sha256:20f7cda3244922ff55bc06e9fb0aee1e5193d1a0e40bee0f3a13d8ccdcb61608
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/payment-service@sha256:67d5ade199e4c2e7990039fde2ff3169e01d5ff1c506c6175e0474590d22316f
     imagePullPolicy: IfNotPresent
     port: 8082
     javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
@@ -332,7 +321,6 @@ components:
       limits:
         cpu: 400m
         memory: 320Mi
-
 observability:
   tracing:
     enabled: false
@@ -377,7 +365,6 @@ observability:
         limits:
           cpu: 300m
           memory: 256Mi
-
 migrations:
   enabled: false
   ttlSecondsAfterFinished: 300
