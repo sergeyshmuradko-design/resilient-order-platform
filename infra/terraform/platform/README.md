@@ -11,8 +11,10 @@ It installs the GitOps bootstrap platform:
 
 External Secrets Operator, Gateway API CRDs, NGINX Gateway Fabric, RabbitMQ
 operators and optional Strimzi are now Argo CD Applications rendered from
-`infra/root`. Terraform passes their versions/feature flags into the root chart
-but does not manage them as individual Terraform resources.
+`infra/root`. Terraform passes shared bootstrap settings and pinned chart
+versions into the root chart, but it does not manage those operators as
+individual Terraform resources. Operator enable/disable flags live in
+`infra/root/values.yaml`.
 
 RabbitMQ operators are enabled by default because `infra/platform-runtime`
 declares a `RabbitmqCluster` and `infra/services` declares RabbitMQ topology

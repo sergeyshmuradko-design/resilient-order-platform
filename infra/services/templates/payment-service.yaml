@@ -56,16 +56,21 @@ spec:
               value: "false"
             - name: MANAGEMENT_HEALTH_VAULT_ENABLED
               value: "false"
+            - name: SPRING_FLYWAY_ENABLED
+              value: "false"
+            - name: SPRING_RABBITMQ_DYNAMIC
+              value: "false"
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 10
             failureThreshold: 60
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 300
             periodSeconds: 20

@@ -70,24 +70,6 @@ variable "rabbitmq_operator_namespace" {
   default     = "rabbitmq-system"
 }
 
-variable "enable_strimzi" {
-  description = "Enable the Strimzi Kafka Operator Argo Application. Keep it disabled in the default Codespaces slice until Kafka is tested."
-  type        = bool
-  default     = false
-}
-
-variable "enable_rabbitmq_operators" {
-  description = "Enable RabbitMQ Cluster Operator and Messaging Topology Operator through the root GitOps Application."
-  type        = bool
-  default     = true
-}
-
-variable "enable_gateway_controller" {
-  description = "Enable Gateway API CRDs and NGINX Gateway Fabric through the root GitOps Application."
-  type        = bool
-  default     = true
-}
-
 variable "enable_argocd_application" {
   description = "Create the root Argo CD Application that syncs the GitOps app-of-apps chart."
   type        = bool

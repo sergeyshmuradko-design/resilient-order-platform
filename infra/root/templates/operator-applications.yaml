@@ -246,4 +246,76 @@ spec:
       - CreateNamespace=true
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.operators.kyverno.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.kyverno.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.kyverno.repoURL | quote }}
+    chart: {{ .Values.operators.kyverno.chart | quote }}
+    targetRevision: {{ .Values.operators.kyverno.targetRevision | quote }}
+    helm:
+      releaseName: kyverno
+      parameters:
+        - name: admissionController.replicas
+          value: "1"
+        - name: admissionController.resources.requests.cpu
+          value: 25m
+        - name: admissionController.resources.requests.memory
+          value: 128Mi
+        - name: admissionController.resources.limits.cpu
+          value: 300m
+        - name: admissionController.resources.limits.memory
+          value: 384Mi
+        - name: backgroundController.replicas
+          value: "1"
+        - name: backgroundController.resources.requests.cpu
+          value: 10m
+        - name: backgroundController.resources.requests.memory
+          value: 64Mi
+        - name: backgroundController.resources.limits.cpu
+          value: 150m
+        - name: backgroundController.resources.limits.memory
+          value: 192Mi
+        - name: cleanupController.replicas
+          value: "1"
+        - name: cleanupController.resources.requests.cpu
+          value: 10m
+        - name: cleanupController.resources.requests.memory
+          value: 64Mi
+        - name: cleanupController.resources.limits.cpu
+          value: 150m
+        - name: cleanupController.resources.limits.memory
+          value: 192Mi
+        - name: reportsController.replicas
+          value: "1"
+        - name: reportsController.resources.requests.cpu
+          value: 10m
+        - name: reportsController.resources.requests.memory
+          value: 64Mi
+        - name: reportsController.resources.limits.cpu
+          value: 150m
+        - name: reportsController.resources.limits.memory
+          value: 192Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.kyverno.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
 {{- end }}

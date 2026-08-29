@@ -48,7 +48,7 @@ spec:
             - name: FLYWAY_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.secrets.targetName }}
+                  name: {{ $.Values.secrets.migration.targetName }}
                   key: {{ .ownerPasswordSecretKey }}
 ---
 {{- end }}

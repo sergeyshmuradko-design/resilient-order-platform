@@ -5,7 +5,7 @@
 # ESO creates a small RabbitMQ credentials Secret for one application user.
 # The topology operator requires referenced credential Secrets to have the
 # rabbitmq.com/topology-operator label, so we do not point it at the broad
-# platform-secrets Secret directly.
+# runtime Secret directly.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -115,6 +115,28 @@ spec:
   arguments:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
+{{- range .Values.rabbitmqTopology.policies }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: {{ .resourceName | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .resourceName "component" "messaging") | nindent 4 }}
+spec:
+  name: {{ .name | quote }}
+  vhost: {{ $root.Values.rabbitmqTopology.vhost | quote }}
+  pattern: {{ .pattern | quote }}
+  applyTo: {{ .applyTo | quote }}
+  priority: {{ .priority | default 0 }}
+  definition:
+    {{- toYaml .definition | nindent 4 }}
   rabbitmqClusterReference:
     name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
     namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}

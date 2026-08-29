@@ -15,6 +15,31 @@ platform-system layer owns only shared plumbing and access boundaries.
 chart directly. This folder is the future standalone platform-system repository
 boundary.
 
+## Kyverno Guardrails
+
+Kyverno policies are disabled by default. When the Kyverno operator is enabled
+from `infra/root/values.yaml`, enable this chart's policy layer with:
+
+```yaml
+policy:
+  kyverno:
+    enabled: true
+    validationFailureAction: Audit
+```
+
+The default `Audit` mode reports violations without blocking resources. After
+the reports are clean, switch to `Enforce` to reject unsafe manifests at
+admission time.
+
+Current guardrails:
+
+- `order-service` and `notification-service` must keep
+  `SPRING_RABBITMQ_DYNAMIC=false`;
+- RabbitMQ `Queue.spec.arguments` is disallowed so runtime behaviour is managed
+  by RabbitMQ `Policy` CRs;
+- application/platform Deployments cannot use the mutable `latest` image tag;
+- application/platform workloads must declare CPU and memory requests/limits.
+
 ## Infisical Contract
 
 External Secrets Operator reads the following keys from the configured

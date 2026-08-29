@@ -60,8 +60,8 @@ handoff.
   to sync.
 - namespace variables: platform, application, external-secrets, argocd,
   strimzi and nginx-gateway.
-- feature flags: optionally enable Strimzi, keep Gateway controller enabled by
-  default and create the GitOps bootstrap Helm release.
+- `enable_argocd_application`: optional Terraform switch for creating the root
+  Argo CD Application handoff.
 - Infisical variables: project/environment/path plus the Universal Auth
   Client ID/Secret used by ESO in Codespaces.
 - chart version variables: pinned versions for reproducible installs.
@@ -78,7 +78,8 @@ handoff.
 
 Terraform no longer owns Kubernetes namespaces, Gateway CRDs, External Secrets
 Operator, RabbitMQ operators or NGINX Gateway Fabric as individual resources.
-Those are GitOps resources reconciled by Argo CD from `infra/root`.
+Those are GitOps resources reconciled by Argo CD from `infra/root`. Operator
+enable/disable flags live in `infra/root/values.yaml`, not in Terraform.
 
 `platform/outputs.tf`
 

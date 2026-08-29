@@ -19,6 +19,8 @@ spec:
     storage: {{ .Values.components.rabbitmq.storage | quote }}
   rabbitmq:
     additionalConfig: |
-      vm_memory_high_watermark.relative = 0.4
+      # The operator default disk alarm threshold is too high for the tiny
+      # local PVC used by this project. Keep only this storage-specific override
+      # and let the RabbitMQ operator derive memory settings from Pod limits.
       disk_free_limit.absolute = {{ .Values.components.rabbitmq.diskFreeLimitBytes }}
 {{- end }}

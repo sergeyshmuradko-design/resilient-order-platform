@@ -22,6 +22,61 @@ resource "helm_release" "argocd" {
   wait    = true
   timeout = 300
 
+  values = [
+    yamlencode({
+      configs = {
+        cm = {
+          # Argo CD removed built-in health for argoproj.io/Application in 1.8.
+          # The root app uses the app-of-apps pattern with sync waves, so the
+          # parent Application needs this small health check to wait for child
+          # Applications to report their own health instead of only creating
+          # their Application CRs.
+          "resource.customizations.health.argoproj.io_Application" = <<-LUA
+            hs = {}
+            hs.status = "Progressing"
+            hs.message = ""
+            if obj.status ~= nil then
+              if obj.status.health ~= nil then
+                hs.status = obj.status.health.status
+                if obj.status.health.message ~= nil then
+                  hs.message = obj.status.health.message
+                end
+              end
+            end
+            return hs
+          LUA
+
+          # ExternalSecret is useful to Argo CD only after External Secrets
+          # Operator has reconciled it into a Kubernetes Secret. The CR can be
+          # created before the backing Secret exists, so app-of-apps bootstrap
+          # should wait for the Ready=True condition instead of treating the CR
+          # creation itself as healthy.
+          "resource.customizations.health.external-secrets.io_ExternalSecret" = <<-LUA
+            hs = {}
+            hs.status = "Progressing"
+            hs.message = "Waiting for ExternalSecret Ready condition"
+            if obj.status ~= nil and obj.status.conditions ~= nil then
+              for _, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Ready" then
+                  if condition.message ~= nil then
+                    hs.message = condition.message
+                  end
+                  if condition.status == "True" then
+                    hs.status = "Healthy"
+                  elseif condition.status == "False" then
+                    hs.status = "Degraded"
+                  end
+                  return hs
+                end
+              end
+            end
+            return hs
+          LUA
+        }
+      }
+    })
+  ]
+
   set {
     name  = "configs.params.server\\.insecure"
     value = "true"
@@ -160,28 +215,8 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.nginx_gateway_chart_version
   }
   set {
-    name  = "operators.strimzi.enabled"
-    value = var.enable_strimzi
-  }
-  set {
     name  = "operators.strimzi.targetRevision"
     value = var.strimzi_chart_version
-  }
-  set {
-    name  = "operators.externalSecrets.enabled"
-    value = "true"
-  }
-  set {
-    name  = "operators.rabbitmq.enabled"
-    value = var.enable_rabbitmq_operators
-  }
-  set {
-    name  = "operators.gatewayApiCrds.enabled"
-    value = var.enable_gateway_controller
-  }
-  set {
-    name  = "operators.nginxGateway.enabled"
-    value = var.enable_gateway_controller
   }
   set {
     name  = "secrets.external.infisical.hostAPI"

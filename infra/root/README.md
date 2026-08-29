@@ -15,9 +15,23 @@ resilient-orders-external-secrets    -> External Secrets Operator
 resilient-orders-gateway-api-crds    -> Gateway API CRDs
 resilient-orders-nginx-gateway       -> NGINX Gateway Fabric
 resilient-orders-rabbitmq-operator   -> RabbitMQ Cluster/Topology operators
+resilient-orders-kyverno             -> Kyverno policy engine, disabled by default
 resilient-orders-platform-system   -> infra/platform-system
 resilient-orders-platform-runtime  -> infra/platform-runtime
 resilient-orders-services          -> infra/services
+```
+
+Operator enable/disable switches are owned here, in `infra/root/values.yaml`.
+Terraform only creates the root handoff and passes shared bootstrap settings
+such as repository URL, target revision, namespaces and pinned chart versions.
+
+Kyverno is disabled by default to keep the local Codespaces slice small. Enable
+it by setting:
+
+```yaml
+operators:
+  kyverno:
+    enabled: true
 ```
 
 Deployment order is kept at this boundary with Argo CD sync waves. Individual

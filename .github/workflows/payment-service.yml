@@ -65,13 +65,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: services/payment-service
           push: true
           tags: |
             ${{ steps.image.outputs.sha_image }}
-            ${{ steps.image.outputs.repository }}:main
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -83,7 +83,7 @@ jobs:
       - name: Commit GitOps image update
         shell: bash
         env:
-          IMAGE: ${{ steps.image.outputs.sha_image }}
+          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
         run: |
           set -euo pipefail
 

@@ -9,6 +9,7 @@ namespaces:
   rabbitmqOperator: rabbitmq-system
   nginxGateway: nginx-gateway
   strimzi: strimzi-system
+  kyverno: kyverno-system
 
 containerImagePrefix: ghcr.io/sergeyshmuradko-design/resilient-order-platform
 
@@ -48,6 +49,13 @@ operators:
     repoURL: quay.io/strimzi-helm
     chart: strimzi-kafka-operator
     targetRevision: 1.1.0
+  kyverno:
+    enabled: false
+    applicationName: resilient-orders-kyverno
+    namespace: kyverno-system
+    repoURL: https://kyverno.github.io/kyverno
+    chart: kyverno
+    targetRevision: 3.5.2
 
 secrets:
   external:

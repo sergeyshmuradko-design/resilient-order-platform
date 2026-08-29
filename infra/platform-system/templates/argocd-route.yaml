@@ -1,0 +1,45 @@
+{{- if and .Values.gateway.enabled .Values.gateway.routes.argocd.enabled }}
+# Optional local/prod-like route for the Argo CD UI.
+#
+# The HTTPRoute is created next to the shared Gateway in the platform namespace,
+# while the backend Service lives in the Argo CD namespace. Gateway API requires
+# an explicit ReferenceGrant in the backend namespace for that cross-namespace
+# reference, so both resources are declared together here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "argocd" "component" "platform-ui") | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name | quote }}
+  hostnames:
+    - {{ .Values.gateway.hosts.argocd | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ .Values.gateway.routes.argocd.backendService | quote }}
+          namespace: {{ .Values.gateway.routes.argocd.backendNamespace | quote }}
+          port: {{ .Values.gateway.routes.argocd.backendPort }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-platform-gateway-to-argocd-server
+  namespace: {{ .Values.gateway.routes.argocd.backendNamespace | quote }}
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "argocd-referencegrant" "component" "platform-ui") | nindent 4 }}
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: {{ .Release.Namespace | quote }}
+  to:
+    - group: ""
+      kind: Service
+      name: {{ .Values.gateway.routes.argocd.backendService | quote }}
+{{- end }}

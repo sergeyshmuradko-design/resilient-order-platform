@@ -9,7 +9,7 @@ spec:
   type: {{ .Values.exposure.orderService.type }}
   ports:
     - name: http
-      port: {{ .Values.exposure.orderService.port }}
+      port: {{ .Values.components.orderService.port }}
       targetPort: http
   selector:
     app.kubernetes.io/name: order-service
@@ -56,33 +56,33 @@ spec:
             - name: MANAGEMENT_HEALTH_VAULT_ENABLED
               value: "false"
             - name: SPRING_FLYWAY_ENABLED
-              value: {{ .Values.components.orderService.flywayEnabled | quote }}
+              value: "false"
             - name: SECURITY_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: JWT_SECRET
             - name: SECURITY_LOCAL_USERS_0_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_ADMIN_USERNAME
             - name: SECURITY_LOCAL_USERS_0_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_ADMIN_PASSWORD
             - name: SECURITY_LOCAL_USERS_0_ROLES_0
               value: ADMIN
             - name: SECURITY_LOCAL_USERS_1_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_USER_USERNAME
             - name: SECURITY_LOCAL_USERS_1_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_USER_PASSWORD
             - name: SECURITY_LOCAL_USERS_1_ROLES_0
               value: USER
@@ -96,31 +96,23 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_DB_PASSWORD
-            - name: SPRING_FLYWAY_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: app-contracts-config
-                  key: ORDER_SERVICE_DB_OWNER_USER
-            - name: SPRING_FLYWAY_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
-                  key: ORDER_SERVICE_DB_OWNER_PASSWORD
             - name: SPRING_DATA_REDIS_HOST
               value: {{ .Values.platform.redisHost | quote }}
             - name: SPRING_RABBITMQ_HOST
               value: {{ .Values.platform.rabbitmqHost | quote }}
+            - name: SPRING_RABBITMQ_DYNAMIC
+              value: "false"
             - name: SPRING_RABBITMQ_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_RABBITMQ_USERNAME
             - name: SPRING_RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.targetName }}
+                  name: {{ .Values.secrets.runtime.targetName }}
                   key: ORDER_SERVICE_RABBITMQ_PASSWORD
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: {{ .Values.components.kafka.clusterName }}-kafka-bootstrap.{{ .Values.platform.namespace }}.svc.cluster.local:9092
@@ -132,14 +124,15 @@ spec:
               value: {{ .Values.platform.jaegerOtlpHttpUrl | quote }}
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 10
             failureThreshold: 60
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 300
             periodSeconds: 20

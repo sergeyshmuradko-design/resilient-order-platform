@@ -21,7 +21,6 @@ operators:
   nginxGateway:
     targetRevision: 2.6.7
   strimzi:
-    enabled: false
     targetRevision: 1.1.0
 
 secrets:

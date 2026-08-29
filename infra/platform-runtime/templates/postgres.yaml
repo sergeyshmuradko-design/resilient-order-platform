@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "resilient-orders.componentLabels" (dict "root" . "name" "postgres" "component" "database") | nindent 4 }}
 spec:
+  # StatefulSet uses this headless Service for stable pod DNS names such as
+  # postgres-0.postgres.<namespace>.svc.cluster.local. With one PostgreSQL pod,
+  # clients can still use the shorter postgres:5432 Service name.
+  clusterIP: None
   ports:
     - name: postgres
       port: 5432

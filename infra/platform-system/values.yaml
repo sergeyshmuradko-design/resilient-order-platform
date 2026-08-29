@@ -47,6 +47,14 @@ guardrails:
     maxCpu: 500m
     maxMemory: 512Mi
 
+policy:
+  kyverno:
+    # Disabled by default to keep the small Codespaces stack light. Enable
+    # together with operators.kyverno.enabled in infra/root/values.yaml when
+    # you want Kubernetes admission-policy checks.
+    enabled: false
+    validationFailureAction: Audit
+
 config:
   postgresDb: orders_db
   postgresUser: orders_user
@@ -92,19 +100,6 @@ database:
         value: notification_service_app
         passwordSecretKey: NOTIFICATION_SERVICE_DB_PASSWORD
 
-exposure:
-  # Default keeps Services internal. Browser/API access is handled by Gateway API
-  # in local/prod-like profiles instead of exposing many LoadBalancer Services.
-  orderService:
-    type: ClusterIP
-    port: 8081
-  prometheus:
-    type: ClusterIP
-    port: 9090
-  grafana:
-    type: ClusterIP
-    port: 3000
-
 gateway:
   enabled: true
   name: platform-gateway
@@ -112,11 +107,12 @@ gateway:
   hostname: "*.localhost"
   hosts:
     argocd: argocd.localhost
-    grafana: grafana.localhost
-    prometheus: prometheus.localhost
   routes:
     argocd:
       enabled: true
+      backendNamespace: argocd
+      backendService: argo-cd-argocd-server
+      backendPort: 80
   allowedRoutes:
     namespaces:
       from: Selector

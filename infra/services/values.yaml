@@ -57,7 +57,6 @@ exposure:
   # in local/prod-like profiles instead of exposing many LoadBalancer Services.
   orderService:
     type: ClusterIP
-    port: 8081
   prometheus:
     type: ClusterIP
     port: 9090
@@ -75,32 +74,32 @@ routes:
     notificationService: notification.localhost
 
 secrets:
-  # The app namespace receives its own platform-secrets Secret from the same
-  # Infisical-backed ClusterSecretStore. This lets application Pods read only
-  # the Secret in their namespace instead of accessing platform namespace
-  # Secrets or Infisical directly.
-  targetName: platform-secrets
+  # Application namespace copies of secrets from the Infisical-backed
+  # ClusterSecretStore. Runtime Pods and migration Jobs get different Kubernetes
+  # Secrets so the long-running application containers cannot read database
+  # owner credentials.
   external:
     refreshInterval: 1m
     storeName: infisical-cluster-store
+  runtime:
+    targetName: runtime-secrets
     keys:
-      - POSTGRES_PASSWORD
-      - POSTGRES_EXPORTER_PASSWORD
-      - ORDER_SERVICE_DB_OWNER_PASSWORD
       - ORDER_SERVICE_DB_PASSWORD
-      - NOTIFICATION_SERVICE_DB_OWNER_PASSWORD
       - NOTIFICATION_SERVICE_DB_PASSWORD
       - JWT_SECRET
       - ORDER_SERVICE_RABBITMQ_USERNAME
       - ORDER_SERVICE_RABBITMQ_PASSWORD
       - NOTIFICATION_SERVICE_RABBITMQ_USERNAME
       - NOTIFICATION_SERVICE_RABBITMQ_PASSWORD
-      - GRAFANA_ADMIN_USER
-      - GRAFANA_ADMIN_PASSWORD
       - ORDER_SERVICE_ADMIN_USERNAME
       - ORDER_SERVICE_ADMIN_PASSWORD
       - ORDER_SERVICE_USER_USERNAME
       - ORDER_SERVICE_USER_PASSWORD
+  migration:
+    targetName: migration-secrets
+    keys:
+      - ORDER_SERVICE_DB_OWNER_PASSWORD
+      - NOTIFICATION_SERVICE_DB_OWNER_PASSWORD
 
 serviceOwnerRbac:
   enabled: true
@@ -150,19 +149,33 @@ rabbitmqTopology:
       durable: true
       autoDelete: false
       deletionPolicy: delete
-      arguments:
-        x-dead-letter-exchange: order.dlx
-        x-dead-letter-routing-key: order.created.dlq
-        x-message-ttl: 300000
-        x-max-length: 1000
     - resourceName: order-created-dlq
       name: order.created.dlx
       durable: true
       autoDelete: false
       deletionPolicy: delete
-      arguments:
-        x-message-ttl: 300000
-        x-max-length: 1000
+  policies:
+    # Runtime queue behaviour is managed with RabbitMQ policies instead of
+    # hardcoded queue x-arguments. TTL, length limits and DLX routing can then
+    # be changed without deleting/redeclaring queues.
+    - resourceName: order-created-queue-policy
+      name: order-created-queue-policy
+      pattern: "^order\\.created\\.queue$"
+      applyTo: queues
+      priority: 10
+      definition:
+        dead-letter-exchange: order.dlx
+        dead-letter-routing-key: order.created.dlq
+        message-ttl: 300000
+        max-length: 1000
+    - resourceName: order-created-dlq-policy
+      name: order-created-dlq-policy
+      pattern: "^order\\.created\\.dlx$"
+      applyTo: queues
+      priority: 10
+      definition:
+        message-ttl: 300000
+        max-length: 1000
   bindings:
     - resourceName: order-created-binding
       source: order.exchange
@@ -276,10 +289,11 @@ components:
         memory: 256Mi
   paymentService:
     enabled: true
-    # The payment-service workflow updates this immutable image reference after
-    # a reviewed merge builds and publishes a new image.
-    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/payment-service:main
-    imagePullPolicy: Always
+    # Pin services by immutable image digest. Mutable tags such as main/latest
+    # are convenient locally, but production-style GitOps should deploy an exact
+    # artifact so rollback and audit both point to a real image.
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/payment-service@sha256:20f7cda3244922ff55bc06e9fb0aee1e5193d1a0e40bee0f3a13d8ccdcb61608
+    imagePullPolicy: IfNotPresent
     port: 8082
     javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
     resources:
@@ -291,12 +305,11 @@ components:
         memory: 256Mi
   orderService:
     enabled: false
-    image: resilient-orders/order-service:local
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/order-service@sha256:6199952cef1465d39a3a81ffb626f232f6458c99a6a8da849135a1ef19dee13f
     migrationImage: resilient-orders/order-service-migrations:local
     imagePullPolicy: IfNotPresent
     port: 8081
     springProfiles: docker
-    flywayEnabled: true
     javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
     resources:
       requests:
@@ -307,11 +320,10 @@ components:
         memory: 384Mi
   notificationService:
     enabled: false
-    image: resilient-orders/notification-service:local
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/notification-service@sha256:4a74f3e36064961261db9bf0007f552cc10c6eba1610b188c77d4f103d20b582
     migrationImage: resilient-orders/notification-service-migrations:local
     imagePullPolicy: IfNotPresent
     port: 8083
-    flywayEnabled: true
     javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
     resources:
       requests:

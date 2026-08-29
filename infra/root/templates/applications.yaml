@@ -89,7 +89,6 @@ spec:
       prune: {{ .Values.sync.automated.prune }}
       selfHeal: {{ .Values.sync.automated.selfHeal }}
     syncOptions:
-      - CreateNamespace=true
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
 ---
@@ -123,7 +122,6 @@ spec:
       prune: {{ .Values.sync.automated.prune }}
       selfHeal: {{ .Values.sync.automated.selfHeal }}
     syncOptions:
-      - CreateNamespace=true
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
 {{- end }}

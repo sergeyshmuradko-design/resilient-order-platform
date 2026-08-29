@@ -106,18 +106,9 @@ exposure:
 gateway:
   enabled: false
   name: platform-gateway
-  className: nginx
-  hostname: "*.localhost"
   hosts:
-    argocd: argocd.localhost
     grafana: grafana.localhost
     prometheus: prometheus.localhost
-  routes:
-    argocd:
-      enabled: false
-  allowedRoutes:
-    namespaces:
-      from: Selector
 
 secrets:
   # platform-secrets is produced by External Secrets Operator from Infisical in the
