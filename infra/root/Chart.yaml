@@ -1,0 +1,6 @@
+apiVersion: v2
+name: resilient-orders-root
+description: Root Argo CD app-of-apps chart for the Resilient Order Platform.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

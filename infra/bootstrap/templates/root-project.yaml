@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .Values.root.projectName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+spec:
+  description: Bootstrap project for the root app-of-apps Application.
+  sourceRepos:
+    - {{ .Values.repositoryUrl | quote }}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.argocd | quote }}
+  namespaceResourceWhitelist:
+    - group: argoproj.io
+      kind: AppProject
+    - group: argoproj.io
+      kind: Application

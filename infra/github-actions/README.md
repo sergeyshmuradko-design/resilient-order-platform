@@ -39,56 +39,76 @@ docker ps
 gh auth status
 ```
 
-4. Prepare local secrets once:
+4. Optional for Docker Compose only: prepare local `.env` secrets once:
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env` locally. Do not commit it.
+Then edit `.env` locally. Do not commit it. The GitOps/Kubernetes bootstrap no
+longer reads this file.
 
-5. Start the runner in a dedicated terminal and leave that terminal open:
+5. Configure Infisical settings in GitHub once:
+
+```text
+Repository -> Settings -> Secrets and variables -> Actions
+```
+
+Add repository secrets:
+
+```text
+INFISICAL_UNIVERSAL_AUTH_CLIENT_ID
+INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET
+```
+
+Add repository variables:
+
+```text
+INFISICAL_HOST_API=https://app.infisical.com
+INFISICAL_PROJECT_SLUG=<your-infisical-project-slug>
+INFISICAL_ENVIRONMENT_SLUG=dev
+INFISICAL_SECRETS_PATH=/
+```
+
+6. Start the runner in a dedicated terminal and leave that terminal open:
 
 ```bash
 make github-runner-start
 ```
 
-The script detects `GITHUB_REPOSITORY` from `gh` or `git remote`, pins a known
-working GitHub Actions Runner version, and exports `TF_VAR_local_env_file` to
-the local workspace `.env`. Override these variables only when testing a
-different repository, runner version, or secret source.
+The script detects `GITHUB_REPOSITORY` from `gh` or `git remote` and pins a
+known working GitHub Actions Runner version. Secrets are no longer loaded from
+the local `.env` file during the GitOps bootstrap; the workflow receives
+Infisical connection settings from GitHub Actions secrets and variables.
 
-6. In GitHub, open:
+7. In GitHub, open:
 
 ```text
-Repository -> Actions -> GitOps Bootstrap Codespaces -> Run workflow
+Repository -> Actions -> Codespaces Cluster Setup -> Run workflow
 ```
 
 For the first run choose:
 
 ```text
-apply = false
-destroy = false
+mode = plan
 ```
 
 If the plan is acceptable, run the workflow again with:
 
 ```text
-apply = true
-destroy = false
+mode = apply
 ```
 
 To return Codespaces to the pre-cluster state:
 
 ```text
-apply = true
-destroy = true
+mode = destroy
 ```
 
-7. Watch the runner terminal. A healthy idle runner prints that it is listening
+8. Watch the runner terminal. A healthy idle runner prints that it is listening
 for jobs. When the workflow starts, the terminal shows each GitHub Actions step.
 
-8. Check Kubernetes after a successful apply:
+9. Check Kubernetes after a successful apply:
 
 ```bash
 kubectl get pods -n argocd
@@ -99,7 +119,7 @@ kubectl get secret platform-secrets -n resilient-orders-platform
 helm list -A
 ```
 
-9. Stop the runner:
+10. Stop the runner:
 
 ```bash
 Ctrl+C
@@ -145,7 +165,7 @@ repository runner settings.
 
 `github-runner-prune` removes local workflow checkouts, diagnostics and old
 runner binary folders under `.local/github-runner`. The bootstrap workflow also
-marks the runner for pruning after a successful `destroy=true` run; the start
+marks the runner for pruning after a successful `mode=destroy` run; the start
 script performs the prune only after the GitHub Actions job has fully exited.
 
 ## What Actually Happens
@@ -166,11 +186,13 @@ Starting the runner does not start Terraform. The sequence is:
    directory.
 8. The `hashicorp/setup-terraform` step downloads Terraform for that job.
 9. Terraform runs from `infra/terraform`.
-10. The workflow plans or applies `infra/terraform/codespaces` first.
-11. The workflow plans or applies `infra/terraform/platform` second.
-12. With `destroy=true`, the workflow deletes Argo CD Applications first,
-    destroys `platform`, then destroys `codespaces`, which deletes the k3d
-    cluster.
+10. With `mode=plan`, the workflow plans `infra/terraform/codespaces`.
+11. With `mode=apply`, the workflow applies `codespaces`, then plans and
+    applies `platform`.
+12. With `mode=destroy`, Terraform destroys `platform` first. The platform
+    layer removes the GitOps bootstrap Helm release before Argo CD, so Argo CD
+    can prune child Applications while its controller is still running. Then the
+    workflow destroys `codespaces`, which deletes the k3d cluster.
 13. After a successful destroy, the runner start script prunes local runner
     working data so `.local/github-runner` does not keep growing.
 
@@ -180,12 +202,12 @@ Detailed line-by-line notes:
 
 - [start-codespaces-runner.sh](RUNNER_SCRIPT_EXPLAINED.md#start-codespaces-runnersh)
 - [cleanup-codespaces-runner.sh](RUNNER_SCRIPT_EXPLAINED.md#cleanup-codespaces-runnersh)
-- [gitops-bootstrap-codespaces.yml](WORKFLOW_EXPLAINED.md)
+- [codespaces-cluster-setup.yml](WORKFLOW_EXPLAINED.md)
 
 Terraform bootstrap explanation:
 
 - [Terraform files explained](../terraform/TERRAFORM_EXPLAINED.md)
 
-Service CI/CD:
+Service workflows:
 
-- [Service CI/CD](SERVICE_CICD.md)
+- [payment-service CI/CD](PAYMENT_SERVICE_CICD.md)

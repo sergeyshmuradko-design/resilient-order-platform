@@ -28,14 +28,8 @@ variable "target_revision" {
   default     = "main"
 }
 
-variable "local_env_file" {
-  description = "Local .env file used only for Codespaces bootstrap into local Vault."
-  type        = string
-  default     = "../../../.env"
-}
-
 variable "platform_namespace" {
-  description = "Namespace for admin-owned platform components such as Vault and PostgreSQL."
+  description = "Namespace for admin-owned platform components such as PostgreSQL."
   type        = string
   default     = "resilient-orders-platform"
 }
@@ -59,51 +53,71 @@ variable "argocd_namespace" {
 }
 
 variable "strimzi_namespace" {
-  description = "Namespace where Strimzi Kafka Operator runs."
+  description = "Namespace where the Strimzi Kafka Operator Argo Application deploys."
   type        = string
   default     = "strimzi-system"
 }
 
 variable "nginx_gateway_namespace" {
-  description = "Namespace where NGINX Gateway Fabric runs."
+  description = "Namespace where the NGINX Gateway Fabric Argo Application deploys."
   type        = string
   default     = "nginx-gateway"
 }
 
-variable "enable_strimzi" {
-  description = "Install Strimzi Kafka Operator. Keep it disabled in the default Codespaces slice until Kafka is tested."
-  type        = bool
-  default     = false
-}
-
-variable "enable_gateway_controller" {
-  description = "Install Gateway API CRDs and NGINX Gateway Fabric for the future HTTP routing stage."
-  type        = bool
-  default     = true
-}
-
-variable "enable_local_vault_seed" {
-  description = "Seed local Vault from .env after Argo CD creates the Vault Deployment."
-  type        = bool
-  default     = true
+variable "rabbitmq_operator_namespace" {
+  description = "Namespace where RabbitMQ Cluster Operator and Messaging Topology Operator deploy."
+  type        = string
+  default     = "rabbitmq-system"
 }
 
 variable "enable_argocd_application" {
-  description = "Create the Argo CD Application that syncs the initial PostgreSQL platform chart."
+  description = "Create the root Argo CD Application that syncs the GitOps app-of-apps chart."
   type        = bool
   default     = true
 }
 
-variable "enable_argocd_app_application" {
-  description = "Create the Argo CD Application that syncs the first application CI/CD slice."
-  type        = bool
-  default     = true
+variable "infisical_host_api" {
+  description = "Infisical API endpoint used by External Secrets Operator."
+  type        = string
+  default     = "https://app.infisical.com"
 }
 
-variable "enable_argocd_image_updater" {
-  description = "Install Argo CD Image Updater. It watches registry image digests and updates the live Argo CD Application without committing to Git."
-  type        = bool
-  default     = true
+variable "infisical_project_slug" {
+  description = "Infisical project slug that contains resilient-order-platform secrets."
+  type        = string
+  default     = "replace-me"
+}
+
+variable "infisical_environment_slug" {
+  description = "Infisical environment slug, for example dev, staging or prod."
+  type        = string
+  default     = "dev"
+}
+
+variable "infisical_secrets_path" {
+  description = "Infisical secrets path where the expected application keys are stored."
+  type        = string
+  default     = "/"
+}
+
+variable "infisical_auth_secret_name" {
+  description = "Kubernetes Secret name that stores Infisical Universal Auth credentials for ESO."
+  type        = string
+  default     = "infisical-universal-auth"
+}
+
+variable "infisical_client_id" {
+  description = "Infisical Universal Auth Client ID. Set from GitHub Actions secrets for Codespaces runs."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "infisical_client_secret" {
+  description = "Infisical Universal Auth Client Secret. Set from GitHub Actions secrets for Codespaces runs."
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "external_secrets_chart_version" {
@@ -130,8 +144,8 @@ variable "argocd_chart_version" {
   default     = "10.1.3"
 }
 
-variable "argocd_image_updater_chart_version" {
-  description = "Argo CD Image Updater Helm chart version. Pin to keep registry polling behavior reproducible."
+variable "rabbitmq_operator_chart_version" {
+  description = "Bitnami RabbitMQ Cluster Operator chart version. The chart installs both Cluster Operator and Messaging Topology Operator."
   type        = string
-  default     = "1.2.4"
+  default     = "4.4.34"
 }

@@ -1,0 +1,26 @@
+{{- if .Values.components.rabbitmq.enabled }}
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: {{ .Values.components.rabbitmq.clusterName | quote }}
+  annotations:
+    # Allows service-owned topology CRDs in the application namespace to target
+    # this platform-owned RabbitMQ cluster. Without this annotation the topology
+    # operator reconciles only objects in the same namespace as RabbitmqCluster.
+    rabbitmq.com/topology-allowed-namespaces: {{ .Values.namespaces.application | quote }}
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "rabbitmq" "component" "messaging") | nindent 4 }}
+spec:
+  replicas: 1
+  image: {{ .Values.components.rabbitmq.image | quote }}
+  resources:
+    {{- toYaml .Values.components.rabbitmq.resources | nindent 4 }}
+  persistence:
+    storage: {{ .Values.components.rabbitmq.storage | quote }}
+  rabbitmq:
+    additionalConfig: |
+      # The operator default disk alarm threshold is too high for the tiny
+      # local PVC used by this project. Keep only this storage-specific override
+      # and let the RabbitMQ operator derive memory settings from Pod limits.
+      disk_free_limit.absolute = {{ .Values.components.rabbitmq.diskFreeLimitBytes }}
+{{- end }}

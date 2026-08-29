@@ -1,0 +1,91 @@
+{{- if .Values.database.provisioner.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-provisioner-scripts
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "db-provisioner" "component" "database") | nindent 4 }}
+  annotations:
+    # The script ConfigMap is a Helm hook resource so it exists before the
+    # privileged database provisioner Job and is removed after a successful run.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  provision-service-databases.sh: |
+{{ tpl (.Files.Get "files/postgres/provision-service-databases.sh") . | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-provisioner
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "db-provisioner" "component" "database") | nindent 4 }}
+  annotations:
+    # This Job uses platform PostgreSQL administrator credentials from
+    # platform-secrets and must stay in the platform-runtime chart. Developers
+    # declare service database contracts through reviewed values, but do not own
+    # the privileged execution path.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-provisioner
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: {{ .Values.labels.partOf | quote }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-workload
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: db-provisioner
+          image: {{ .Values.database.provisioner.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - /scripts/provision-service-databases.sh
+          env:
+            - name: POSTGRES_HOST
+              value: {{ .Values.external.postgresHost | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.config.postgresDb | quote }}
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.targetName }}
+                  key: POSTGRES_PASSWORD
+            {{- range .Values.database.services }}
+            - name: {{ .ownerRole.configKey }}
+              value: {{ .ownerRole.value | quote }}
+            - name: {{ .ownerRole.passwordSecretKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.targetName }}
+                  key: {{ .ownerRole.passwordSecretKey }}
+            - name: {{ .appRole.configKey }}
+              value: {{ .appRole.value | quote }}
+            - name: {{ .appRole.passwordSecretKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secrets.targetName }}
+                  key: {{ .appRole.passwordSecretKey }}
+            {{- end }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: db-provisioner-scripts
+{{- end }}

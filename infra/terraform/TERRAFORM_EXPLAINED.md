@@ -48,8 +48,8 @@ handoff.
 `platform/versions.tf`
 
 - requires Terraform 1.6+;
-- declares only `hashicorp/helm` and `hashicorp/kubernetes`;
-- configures both providers from `var.kubeconfig_path` and `var.kube_context`;
+- declares only `hashicorp/helm`;
+- configures Helm from `var.kubeconfig_path` and `var.kube_context`;
 - no `hashicorp/null` provider is used.
 
 `platform/variables.tf`
@@ -58,47 +58,28 @@ handoff.
   use.
 - `repository_url` and `target_revision`: tell Argo CD which Git repo/revision
   to sync.
-- `local_env_file`: local-only path to `.env`, default `../../../.env`.
 - namespace variables: platform, application, external-secrets, argocd,
   strimzi and nginx-gateway.
-- feature flags: optionally enable Strimzi, keep Gateway controller enabled by
-  default, enable local Vault seed, create the platform Argo CD Application and
-  create the first app Argo CD Application.
+- `enable_argocd_application`: optional Terraform switch for creating the root
+  Argo CD Application handoff.
+- Infisical variables: project/environment/path plus the Universal Auth
+  Client ID/Secret used by ESO in Codespaces.
 - chart version variables: pinned versions for reproducible installs.
 
 `platform/main.tf`
 
-- `locals.common_labels`: common Kubernetes labels for Terraform-managed
-  namespaces.
-- `kubernetes_namespace_v1.platform`: namespace for Vault/Postgres platform
-  resources; it also receives the Gateway route label for platform UI routes.
-- `kubernetes_namespace_v1.application`: namespace reserved for services; it
-  also receives the Gateway route label.
-- `kubernetes_namespace_v1.external_secrets`: namespace for ESO.
-- `kubernetes_namespace_v1.argocd`: namespace for Argo CD; it receives the
-  Gateway route label so the Argo CD UI can be routed through the shared local
-  Gateway.
-- optional `strimzi` and `nginx_gateway` namespaces are created only when their
-  feature flags are true.
-- `terraform_data.local_vault_token_secrets`: runs a shell helper that creates
-  local bootstrap token Secrets without storing secret values in Terraform
-  state.
-- `helm_release.external_secrets`: installs External Secrets Operator and CRDs.
-- `helm_release.strimzi`: optionally installs Strimzi Kafka Operator. It is
-  disabled in the default Codespaces slice and should be enabled when the Kafka
-  stage is being tested.
-- `terraform_data.gateway_api_crds`: applies Gateway API CRDs via `kubectl
-  kustomize ... | kubectl apply -f -`.
-- `helm_release.nginx_gateway`: installs NGINX Gateway Fabric.
 - `helm_release.argocd`: installs Argo CD with small local resource settings.
-  Dex is disabled because local Codespaces does not use SSO; the Argo CD UI
-  still works with the built-in `admin` user.
-- `terraform_data.argocd_platform_application`: renders the Argo CD Application
-  template and applies it with `kubectl`.
-- `terraform_data.argocd_app_application`: renders the Argo CD Application for
-  the first payment-service GitOps slice and applies it with `kubectl`.
-- `terraform_data.local_vault_seed`: waits for Vault and writes `.env` values
-  into local Vault.
+  Dex, ApplicationSet and notifications are disabled because the Codespaces
+  setup does not use SSO, generated applications or alert fan-out.
+- `helm_release.gitops_bootstrap`: installs `infra/bootstrap`, which creates
+  the root Argo CD AppProject and Application. The root Application points to
+  `infra/root`, which creates operator Applications first, then
+  platform-system, platform-runtime and service workloads.
+
+Terraform no longer owns Kubernetes namespaces, Gateway CRDs, External Secrets
+Operator, RabbitMQ operators or NGINX Gateway Fabric as individual resources.
+Those are GitOps resources reconciled by Argo CD from `infra/root`. Operator
+enable/disable flags live in `infra/root/values.yaml`, not in Terraform.
 
 `platform/outputs.tf`
 
@@ -125,7 +106,7 @@ make terraform-destroy
 
 It destroys:
 
-1. `platform`: Helm releases, namespaces, Argo CD bootstrap resources.
+1. `platform`: GitOps bootstrap release first, then Argo CD.
 2. `codespaces`: local k3d cluster through destroy provisioner.
 
 Runner cleanup is separate:

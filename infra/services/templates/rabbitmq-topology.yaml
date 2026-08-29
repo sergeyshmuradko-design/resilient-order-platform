@@ -1,0 +1,168 @@
+{{- if .Values.rabbitmqTopology.enabled }}
+{{- $root := . -}}
+{{- range .Values.rabbitmqTopology.users }}
+---
+# ESO creates a small RabbitMQ credentials Secret for one application user.
+# The topology operator requires referenced credential Secrets to have the
+# rabbitmq.com/topology-operator label, so we do not point it at the broad
+# runtime Secret directly.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .credentialsSecretName | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .name "component" "messaging") | nindent 4 }}
+spec:
+  refreshInterval: {{ $root.Values.secrets.external.refreshInterval }}
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ $root.Values.secrets.external.storeName }}
+  target:
+    name: {{ .credentialsSecretName | quote }}
+    creationPolicy: Owner
+    template:
+      metadata:
+        labels:
+          rabbitmq.com/topology-operator: "true"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: {{ .usernameSecretKey | quote }}
+    - secretKey: password
+      remoteRef:
+        key: {{ .passwordSecretKey | quote }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: {{ .name | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .name "component" "messaging") | nindent 4 }}
+spec:
+  {{- if .tags }}
+  tags:
+    {{- range .tags }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+  importCredentialsSecret:
+    name: {{ .credentialsSecretName | quote }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: {{ printf "%s-permission" .name | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .name "component" "messaging") | nindent 4 }}
+spec:
+  vhost: {{ $root.Values.rabbitmqTopology.vhost | quote }}
+  userReference:
+    name: {{ .name | quote }}
+  permissions:
+    configure: {{ .permissions.configure | quote }}
+    write: {{ .permissions.write | quote }}
+    read: {{ .permissions.read | quote }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
+{{- range .Values.rabbitmqTopology.exchanges }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: {{ .resourceName | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .resourceName "component" "messaging") | nindent 4 }}
+spec:
+  name: {{ .name | quote }}
+  vhost: {{ $root.Values.rabbitmqTopology.vhost | quote }}
+  type: {{ .type | quote }}
+  durable: {{ .durable }}
+  autoDelete: {{ .autoDelete }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
+{{- range .Values.rabbitmqTopology.queues }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: {{ .resourceName | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .resourceName "component" "messaging") | nindent 4 }}
+spec:
+  name: {{ .name | quote }}
+  vhost: {{ $root.Values.rabbitmqTopology.vhost | quote }}
+  durable: {{ .durable }}
+  autoDelete: {{ .autoDelete }}
+  deletionPolicy: {{ .deletionPolicy | default "delete" | quote }}
+  {{- with .arguments }}
+  arguments:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
+{{- range .Values.rabbitmqTopology.policies }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: {{ .resourceName | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .resourceName "component" "messaging") | nindent 4 }}
+spec:
+  name: {{ .name | quote }}
+  vhost: {{ $root.Values.rabbitmqTopology.vhost | quote }}
+  pattern: {{ .pattern | quote }}
+  applyTo: {{ .applyTo | quote }}
+  priority: {{ .priority | default 0 }}
+  definition:
+    {{- toYaml .definition | nindent 4 }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
+{{- range .Values.rabbitmqTopology.bindings }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: {{ .resourceName | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .resourceName "component" "messaging") | nindent 4 }}
+spec:
+  source: {{ .source | quote }}
+  vhost: {{ $root.Values.rabbitmqTopology.vhost | quote }}
+  destination: {{ .destination | quote }}
+  destinationType: {{ .destinationType | quote }}
+  routingKey: {{ .routingKey | quote }}
+  {{- with .arguments }}
+  arguments:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rabbitmqClusterReference:
+    name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
+    namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
+{{- end }}

@@ -6,16 +6,7 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.17"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.35"
-    }
   }
-}
-
-provider "kubernetes" {
-  config_path    = var.kubeconfig_path
-  config_context = var.kube_context
 }
 
 provider "helm" {

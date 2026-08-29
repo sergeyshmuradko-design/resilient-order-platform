@@ -1,0 +1,321 @@
+{{- /*
+Admin-owned operator layer.
+
+These Applications install CRDs/controllers that must exist before
+platform-system, platform-runtime and services can reconcile their custom
+resources. Root sync waves keep the order explicit:
+
+-50 AppProjects
+-30 operator CRDs/controllers
+-20 platform-system
+-10 platform-runtime
+  0 services
+
+During pruning Argo CD processes waves in reverse order, so service/runtime
+resources are removed before the controllers that understand their CRDs.
+*/ -}}
+{{- if .Values.operators.externalSecrets.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.externalSecrets.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.externalSecrets.repoURL | quote }}
+    chart: {{ .Values.operators.externalSecrets.chart | quote }}
+    targetRevision: {{ .Values.operators.externalSecrets.targetRevision | quote }}
+    helm:
+      releaseName: external-secrets
+      parameters:
+        - name: installCRDs
+          value: "true"
+        - name: resources.requests.cpu
+          value: 10m
+        - name: resources.requests.memory
+          value: 64Mi
+        - name: resources.limits.cpu
+          value: 100m
+        - name: resources.limits.memory
+          value: 128Mi
+        - name: webhook.resources.requests.cpu
+          value: 10m
+        - name: webhook.resources.requests.memory
+          value: 32Mi
+        - name: webhook.resources.limits.cpu
+          value: 100m
+        - name: webhook.resources.limits.memory
+          value: 96Mi
+        - name: certController.resources.requests.cpu
+          value: 10m
+        - name: certController.resources.requests.memory
+          value: 32Mi
+        - name: certController.resources.limits.cpu
+          value: 100m
+        - name: certController.resources.limits.memory
+          value: 96Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.externalSecrets.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.operators.gatewayApiCrds.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.gatewayApiCrds.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.gatewayApiCrds.repoURL | quote }}
+    targetRevision: {{ .Values.operators.gatewayApiCrds.targetRevision | quote }}
+    path: {{ .Values.operators.gatewayApiCrds.path | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.namespaces.nginxGateway | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.operators.nginxGateway.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.nginxGateway.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.nginxGateway.repoURL | quote }}
+    chart: {{ .Values.operators.nginxGateway.chart | quote }}
+    targetRevision: {{ .Values.operators.nginxGateway.targetRevision | quote }}
+    helm:
+      releaseName: ngf
+      parameters:
+        - name: nginx.service.type
+          value: LoadBalancer
+        - name: nginxGateway.replicaCount
+          value: "1"
+        - name: nginxGateway.resources.requests.cpu
+          value: 25m
+        - name: nginxGateway.resources.requests.memory
+          value: 96Mi
+        - name: nginxGateway.resources.limits.cpu
+          value: 300m
+        - name: nginxGateway.resources.limits.memory
+          value: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.nginxGateway.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.operators.rabbitmq.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.rabbitmq.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.rabbitmq.repoURL | quote }}
+    chart: {{ .Values.operators.rabbitmq.chart | quote }}
+    targetRevision: {{ .Values.operators.rabbitmq.targetRevision | quote }}
+    helm:
+      releaseName: rabbitmq-cluster-operator
+      parameters:
+        - name: clusterOperator.watchAllNamespaces
+          value: "true"
+        - name: clusterOperator.replicaCount
+          value: "1"
+        - name: clusterOperator.resources.requests.cpu
+          value: 25m
+        - name: clusterOperator.resources.requests.memory
+          value: 96Mi
+        - name: clusterOperator.resources.limits.cpu
+          value: 200m
+        - name: clusterOperator.resources.limits.memory
+          value: 256Mi
+        - name: msgTopologyOperator.enabled
+          value: "true"
+        - name: msgTopologyOperator.watchAllNamespaces
+          value: "true"
+        - name: msgTopologyOperator.replicaCount
+          value: "1"
+        - name: msgTopologyOperator.resources.requests.cpu
+          value: 25m
+        - name: msgTopologyOperator.resources.requests.memory
+          value: 96Mi
+        - name: msgTopologyOperator.resources.limits.cpu
+          value: 200m
+        - name: msgTopologyOperator.resources.limits.memory
+          value: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.rabbitmq.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.operators.strimzi.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.strimzi.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.strimzi.repoURL | quote }}
+    chart: {{ .Values.operators.strimzi.chart | quote }}
+    targetRevision: {{ .Values.operators.strimzi.targetRevision | quote }}
+    helm:
+      releaseName: strimzi-kafka-operator
+      parameters:
+        - name: watchAnyNamespace
+          value: "true"
+        - name: replicas
+          value: "1"
+        - name: resources.requests.cpu
+          value: 25m
+        - name: resources.requests.memory
+          value: 128Mi
+        - name: resources.limits.cpu
+          value: 300m
+        - name: resources.limits.memory
+          value: 384Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.strimzi.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
+{{- if .Values.operators.kyverno.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.kyverno.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.kyverno.repoURL | quote }}
+    chart: {{ .Values.operators.kyverno.chart | quote }}
+    targetRevision: {{ .Values.operators.kyverno.targetRevision | quote }}
+    helm:
+      releaseName: kyverno
+      parameters:
+        - name: admissionController.replicas
+          value: "1"
+        - name: admissionController.resources.requests.cpu
+          value: 25m
+        - name: admissionController.resources.requests.memory
+          value: 128Mi
+        - name: admissionController.resources.limits.cpu
+          value: 300m
+        - name: admissionController.resources.limits.memory
+          value: 384Mi
+        - name: backgroundController.replicas
+          value: "1"
+        - name: backgroundController.resources.requests.cpu
+          value: 10m
+        - name: backgroundController.resources.requests.memory
+          value: 64Mi
+        - name: backgroundController.resources.limits.cpu
+          value: 150m
+        - name: backgroundController.resources.limits.memory
+          value: 192Mi
+        - name: cleanupController.replicas
+          value: "1"
+        - name: cleanupController.resources.requests.cpu
+          value: 10m
+        - name: cleanupController.resources.requests.memory
+          value: 64Mi
+        - name: cleanupController.resources.limits.cpu
+          value: 150m
+        - name: cleanupController.resources.limits.memory
+          value: 192Mi
+        - name: reportsController.replicas
+          value: "1"
+        - name: reportsController.resources.requests.cpu
+          value: 10m
+        - name: reportsController.resources.requests.memory
+          value: 64Mi
+        - name: reportsController.resources.limits.cpu
+          value: 150m
+        - name: reportsController.resources.limits.memory
+          value: 192Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.kyverno.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+{{- end }}

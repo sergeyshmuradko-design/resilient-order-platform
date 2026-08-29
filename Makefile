@@ -1,18 +1,26 @@
-.PHONY: build infra-up up stop down ps config terraform-fmt terraform-codespaces-init terraform-codespaces-plan terraform-codespaces-apply terraform-codespaces-destroy terraform-platform-init terraform-platform-validate terraform-platform-plan terraform-platform-apply terraform-platform-destroy terraform-init terraform-validate terraform-plan terraform-apply terraform-destroy github-runner-start github-runner-cleanup github-runner-prune helm-external-secrets helm-strimzi-operator helm-gateway-api-crds helm-nginx-gateway helm-operators helm-vault-token-source helm-vault-seed helm-db-provision helm-images-import helm-lint helm-template-dev helm-template-monitoring helm-template-local-expose helm-template-local-gateway helm-template-codespaces helm-template-postgres-only helm-dev helm-monitoring helm-local-expose helm-local-gateway helm-codespaces helm-platform helm-schema-registry helm-apps helm-observability helm-prod-like helm-tracing helm-load helm-delete helm-delete-all load-build load-up load-stop load-down load-config
+.PHONY: build infra-up up stop down ps config terraform-fmt terraform-codespaces-init terraform-codespaces-plan terraform-codespaces-apply terraform-codespaces-destroy terraform-platform-init terraform-platform-validate terraform-platform-plan terraform-platform-apply terraform-platform-destroy terraform-init terraform-validate terraform-plan terraform-apply terraform-destroy github-runner-start github-runner-cleanup github-runner-prune helm-external-secrets helm-strimzi-operator helm-gateway-api-crds helm-nginx-gateway helm-operators helm-infisical-auth-secret helm-db-provision helm-images-import helm-lint helm-template-dev helm-template-monitoring helm-template-local-expose helm-template-local-gateway helm-template-codespaces helm-template-postgres-only helm-dev helm-monitoring helm-local-expose helm-local-gateway helm-codespaces helm-platform helm-schema-registry helm-apps helm-observability helm-prod-like helm-tracing helm-load helm-delete helm-delete-all load-build load-up load-stop load-down load-config
 
 # Compose command used for the load-test variant.
 # The second file overrides only the settings that are different for load tests.
 COMPOSE_LOAD_TEST = docker compose -f docker-compose.yml -f docker-compose.load-test.yml
 
-HELM_ADMIN_RELEASE = resilient-orders-admin
-HELM_APP_RELEASE = resilient-orders-app
+HELM_ROOT_RELEASE = resilient-orders-root
+HELM_PLATFORM_SYSTEM_RELEASE = resilient-orders-platform-system
+HELM_PLATFORM_RUNTIME_RELEASE = resilient-orders-platform-runtime
+HELM_SERVICES_RELEASE = resilient-orders-services
+HELM_ADMIN_RELEASE = $(HELM_PLATFORM_RUNTIME_RELEASE)
+HELM_APP_RELEASE = $(HELM_SERVICES_RELEASE)
 HELM_PLATFORM_NAMESPACE = resilient-orders-platform
 HELM_APP_NAMESPACE = resilient-orders
 HELM_NAMESPACE = $(HELM_APP_NAMESPACE)
-HELM_ADMIN_CHART = infra/helm/admin
-HELM_APP_CHART = infra/helm/app
-HELM_VAULT_TOKEN_SECRET_NAME = vault-token
-HELM_VAULT_DEV_TOKEN_SECRET_NAME = vault-dev-token
+HELM_ROOT_CHART = infra/root
+HELM_PLATFORM_SYSTEM_CHART = infra/platform-system
+HELM_PLATFORM_RUNTIME_CHART = infra/platform-runtime
+HELM_SERVICES_CHART = infra/services
+HELM_ADMIN_CHART = $(HELM_PLATFORM_RUNTIME_CHART)
+HELM_APP_CHART = $(HELM_SERVICES_CHART)
+HELM_INFISICAL_CLIENT_ID ?= replace-me
+HELM_INFISICAL_CLIENT_SECRET ?= replace-me
 K3D_CLUSTER = resilient-orders
 STRIMZI_NAMESPACE = strimzi-system
 NGINX_GATEWAY_NAMESPACE = nginx-gateway
@@ -33,10 +41,10 @@ GITOPS_REPO_URL ?= $(shell git config --get remote.origin.url 2>/dev/null)
 build:
 	docker compose build
 
-# Start only the Docker Compose infrastructure services useful for local
-# experiments with Vault and RabbitMQ without running the full application stack.
+# Start only the Docker Compose infrastructure service useful for local
+# RabbitMQ experiments without running the full application stack.
 infra-up:
-	docker compose up -d vault rabbitmq
+	docker compose up -d rabbitmq
 
 # Start the full local development stack.
 up:
@@ -99,7 +107,7 @@ terraform-platform-plan:
 # Apply the platform GitOps bootstrap:
 # - install platform controllers/operators;
 # - install Argo CD;
-# - create the first Argo CD Application for the PostgreSQL-only platform slice.
+# - install the GitOps bootstrap Helm release that creates the root Application.
 terraform-platform-apply:
 	terraform -chdir=$(TF_PLATFORM_DIR) apply \
 		-var="repository_url=$(GITOPS_REPO_URL)"
@@ -216,59 +224,24 @@ helm-nginx-gateway: helm-gateway-api-crds
 # releases are deployed.
 helm-operators: helm-external-secrets helm-strimzi-operator helm-nginx-gateway
 
-# Create only the local Vault bootstrap token Secrets.
+# Compatibility target for older local notes.
 #
-# `bash -ec` runs one Bash script and stops on the first failing command.
-# `set -a; . ./.env; set +a` temporarily exports every variable from .env so
-# kubectl can read local secret values without committing them to Git.
-helm-vault-token-source:
-	bash -ec 'set -a; . ./.env; set +a; \
-		kubectl create namespace $(HELM_PLATFORM_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-		kubectl create namespace $(HELM_APP_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-		kubectl label namespace $(HELM_PLATFORM_NAMESPACE) $(GATEWAY_ROUTE_LABEL_KEY)=$(GATEWAY_ROUTE_LABEL_VALUE) --overwrite; \
-		kubectl label namespace $(HELM_APP_NAMESPACE) $(GATEWAY_ROUTE_LABEL_KEY)=$(GATEWAY_ROUTE_LABEL_VALUE) --overwrite; \
-		kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -; \
-		kubectl create secret generic $(HELM_VAULT_DEV_TOKEN_SECRET_NAME) --namespace $(HELM_PLATFORM_NAMESPACE) --from-literal=token="$$VAULT_DEV_ROOT_TOKEN_ID" --dry-run=client -o yaml | kubectl apply -f -; \
-		kubectl create secret generic $(HELM_VAULT_TOKEN_SECRET_NAME) --namespace external-secrets --from-literal=token="$$VAULT_DEV_ROOT_TOKEN_ID" --dry-run=client -o yaml | kubectl apply -f -'
+# Infisical Universal Auth is rendered by the platform-system chart. This target
+# stays as a compatibility no-op because the credentials are passed as Helm
+# values, not created by a separate kubectl command.
+helm-infisical-auth-secret:
+	@echo "Infisical Universal Auth is rendered by infra/platform-system; no standalone Secret command is needed."
 
-# Seed local HashiCorp Vault from .env.
-#
-# In cloud mode this target should disappear: OCI Vault / a cloud secret manager
-# owns secret values, while ExternalSecret manifests keep the same shape.
-helm-vault-seed:
-	kubectl wait deployment/vault --namespace $(HELM_PLATFORM_NAMESPACE) --for=condition=Available --timeout=3m
-	bash -ec 'set -a; . ./.env; set +a; \
-		kubectl exec --namespace $(HELM_PLATFORM_NAMESPACE) deploy/vault -- env VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN="$$VAULT_DEV_ROOT_TOKEN_ID" vault kv put secret/resilient-orders \
-			POSTGRES_PASSWORD="$$POSTGRES_PASSWORD" \
-			POSTGRES_EXPORTER_PASSWORD="$$POSTGRES_EXPORTER_PASSWORD" \
-			ORDER_SERVICE_DB_OWNER_PASSWORD="$$ORDER_SERVICE_DB_OWNER_PASSWORD" \
-			ORDER_SERVICE_DB_PASSWORD="$$ORDER_SERVICE_DB_PASSWORD" \
-			NOTIFICATION_SERVICE_DB_OWNER_PASSWORD="$$NOTIFICATION_SERVICE_DB_OWNER_PASSWORD" \
-			NOTIFICATION_SERVICE_DB_PASSWORD="$$NOTIFICATION_SERVICE_DB_PASSWORD" \
-			JWT_SECRET="$$JWT_SECRET" \
-			RABBITMQ_ADMIN_USERNAME="$$RABBITMQ_ADMIN_USERNAME" \
-			RABBITMQ_ADMIN_PASSWORD="$$RABBITMQ_ADMIN_PASSWORD" \
-			ORDER_SERVICE_RABBITMQ_USERNAME="$$ORDER_SERVICE_RABBITMQ_USERNAME" \
-			ORDER_SERVICE_RABBITMQ_PASSWORD="$$ORDER_SERVICE_RABBITMQ_PASSWORD" \
-			NOTIFICATION_SERVICE_RABBITMQ_USERNAME="$$NOTIFICATION_SERVICE_RABBITMQ_USERNAME" \
-			NOTIFICATION_SERVICE_RABBITMQ_PASSWORD="$$NOTIFICATION_SERVICE_RABBITMQ_PASSWORD" \
-			GRAFANA_ADMIN_USER="$$GRAFANA_ADMIN_USER" \
-			GRAFANA_ADMIN_PASSWORD="$$GRAFANA_ADMIN_PASSWORD" \
-			ORDER_SERVICE_ADMIN_USERNAME="$$ORDER_SERVICE_ADMIN_USERNAME" \
-			ORDER_SERVICE_ADMIN_PASSWORD="$$ORDER_SERVICE_ADMIN_PASSWORD" \
-			ORDER_SERVICE_USER_USERNAME="$$ORDER_SERVICE_USER_USERNAME" \
-			ORDER_SERVICE_USER_PASSWORD="$$ORDER_SERVICE_USER_PASSWORD"'
-
-# Run platform-owned database provisioning once secrets are available in Vault.
+# Run platform-owned database provisioning once secrets are available.
 helm-db-provision:
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--reuse-values \
 		--wait \
 		--timeout 5m \
 		--history-max 3 \
 		--set database.provisioner.enabled=true
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--reuse-values \
 		--history-max 3 \
@@ -280,148 +253,100 @@ helm-images-import:
 	k3d image import resilient-orders/payment-service:local --cluster $(K3D_CLUSTER)
 	k3d image import resilient-orders/notification-service:local --cluster $(K3D_CLUSTER)
 
-# Validate both physically separated charts.
+# Validate the physically separated GitOps charts.
 helm-lint:
-	helm lint $(HELM_ADMIN_CHART)
-	helm lint $(HELM_APP_CHART)
+	helm lint $(HELM_ROOT_CHART)
+	helm lint $(HELM_PLATFORM_SYSTEM_CHART)
+	helm lint $(HELM_PLATFORM_RUNTIME_CHART)
+	helm lint $(HELM_SERVICES_CHART)
 
-# Render the dev chart locally without touching a cluster.
+# Render all GitOps charts locally without touching a cluster.
 helm-template-dev:
-	helm template $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+	helm template $(HELM_ROOT_RELEASE) $(HELM_ROOT_CHART) \
+		--namespace argocd \
+		--set repositoryUrl="$(GITOPS_REPO_URL)"
+	helm template $(HELM_PLATFORM_SYSTEM_RELEASE) $(HELM_PLATFORM_SYSTEM_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE)
-	helm template $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
+	helm template $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
+		--namespace $(HELM_PLATFORM_NAMESPACE)
+	helm template $(HELM_SERVICES_RELEASE) $(HELM_SERVICES_CHART) \
 		--namespace $(HELM_APP_NAMESPACE)
 
-# Render the first GitOps slice: Vault, ExternalSecret and PostgreSQL only.
+# Compatibility alias for the first GitOps runtime slice.
 helm-template-postgres-only:
-	helm template $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--values infra/helm/admin/values-postgres-only.yaml
+	helm template $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
+		--namespace $(HELM_PLATFORM_NAMESPACE)
 
-# Render the monitoring profile locally without touching a cluster.
+# Monitoring values now live in the chart's single values.yaml and are disabled
+# until deliberately enabled.
 helm-template-monitoring:
-	helm template $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--values infra/helm/values-observability-monitoring.yaml
+	helm template $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
+		--namespace $(HELM_PLATFORM_NAMESPACE)
 
-# Render monitoring plus local LoadBalancer exposure without touching a cluster.
+# Compatibility aliases for the old local render targets.
 helm-template-local-expose:
-	helm template $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-expose.yaml
-	helm template $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
-		--namespace $(HELM_APP_NAMESPACE) \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-expose.yaml
+	$(MAKE) helm-template-dev
 
-# Render monitoring plus Gateway API exposure without touching a cluster.
 helm-template-local-gateway:
-	helm template $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-gateway.yaml
-	helm template $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
-		--namespace $(HELM_APP_NAMESPACE) \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-gateway.yaml
+	$(MAKE) helm-template-dev
 
-# Render the Codespaces profile without touching a cluster.
 helm-template-codespaces:
-	helm template $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-gateway.yaml \
-		--values infra/helm/values-codespaces.yaml
+	$(MAKE) helm-template-dev
 
 # Apply the base Helm dev profile manually. GitOps should normally use
 # Terraform + Argo CD instead of this target.
-helm-dev: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+helm-dev: helm-infisical-auth-secret
+	helm upgrade --install $(HELM_PLATFORM_SYSTEM_RELEASE) $(HELM_PLATFORM_SYSTEM_CHART) \
+		--namespace $(HELM_PLATFORM_NAMESPACE) \
+		--create-namespace \
+		--history-max 3 \
+		--set secrets.external.infisical.clientId="$(HELM_INFISICAL_CLIENT_ID)" \
+		--set secrets.external.infisical.clientSecret="$(HELM_INFISICAL_CLIENT_SECRET)"
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--create-namespace \
 		--history-max 3
-	$(MAKE) helm-vault-seed
 	$(MAKE) helm-db-provision
-	helm upgrade --install $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
+	helm upgrade --install $(HELM_SERVICES_RELEASE) $(HELM_SERVICES_CHART) \
 		--namespace $(HELM_APP_NAMESPACE) \
 		--create-namespace \
 		--history-max 3
 
-# Apply dev plus lightweight monitoring: postgres-exporter, Prometheus, Grafana.
-helm-monitoring: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-observability-monitoring.yaml
-	$(MAKE) helm-vault-seed
+# The following profile targets are kept as compatibility aliases. Enable the
+# corresponding component in the chart's single values.yaml before using them.
+helm-monitoring: helm-infisical-auth-secret
+	$(MAKE) helm-dev
 
-# Apply monitoring plus local LoadBalancer exposure.
-helm-local-expose: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-expose.yaml
-	$(MAKE) helm-vault-seed
-	$(MAKE) helm-db-provision
-	helm upgrade --install $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
-		--namespace $(HELM_APP_NAMESPACE) \
-		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-expose.yaml
+helm-local-expose: helm-infisical-auth-secret
+	$(MAKE) helm-dev
 
-# Apply monitoring plus Gateway API exposure.
-helm-local-gateway: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-gateway.yaml
-	$(MAKE) helm-vault-seed
-	$(MAKE) helm-db-provision
-	helm upgrade --install $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
-		--namespace $(HELM_APP_NAMESPACE) \
-		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-gateway.yaml
+helm-local-gateway: helm-infisical-auth-secret
+	$(MAKE) helm-dev
 
-# Apply the constrained Codespaces profile manually.
-helm-codespaces: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
-		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-observability-monitoring.yaml \
-		--values infra/helm/values-local-gateway.yaml \
-		--values infra/helm/values-codespaces.yaml
+helm-codespaces: helm-infisical-auth-secret
+	$(MAKE) helm-dev
 
 # Deploy only persistent platform dependencies and Strimzi-managed Kafka.
-helm-platform: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+helm-platform: helm-infisical-auth-secret
+	helm upgrade --install $(HELM_PLATFORM_SYSTEM_RELEASE) $(HELM_PLATFORM_SYSTEM_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--create-namespace \
 		--wait \
 		--timeout 8m \
 		--history-max 3 \
-		--values infra/helm/values-local-gateway.yaml \
-		--values infra/helm/values-codespaces.yaml \
-		--values infra/helm/values-stage-platform.yaml
-	$(MAKE) helm-vault-seed
-	$(MAKE) helm-db-provision
-	kubectl wait kafka/$(KAFKA_CLUSTER) \
+		--set secrets.external.infisical.clientId="$(HELM_INFISICAL_CLIENT_ID)" \
+		--set secrets.external.infisical.clientSecret="$(HELM_INFISICAL_CLIENT_SECRET)"
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
-		--for=condition=Ready \
-		--timeout=10m
+		--create-namespace \
+		--wait \
+		--timeout 8m \
+		--history-max 3
+	$(MAKE) helm-db-provision
 
 # Enable Schema Registry after the Strimzi Kafka cluster has been reconciled.
 helm-schema-registry:
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--reuse-values \
 		--wait \
@@ -431,21 +356,16 @@ helm-schema-registry:
 
 # Enable application Deployments after infrastructure is ready.
 helm-apps:
-	helm upgrade --install $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
+	helm upgrade --install $(HELM_SERVICES_RELEASE) $(HELM_SERVICES_CHART) \
 		--namespace $(HELM_APP_NAMESPACE) \
 		--create-namespace \
 		--wait \
 		--timeout 10m \
-		--history-max 3 \
-		--values infra/helm/values-local-gateway.yaml \
-		--values infra/helm/values-codespaces.yaml \
-		--set components.paymentService.enabled=true \
-		--set components.orderService.enabled=true \
-		--set components.notificationService.enabled=true
+		--history-max 3
 
 # Enable observability after core workloads are running.
 helm-observability:
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--reuse-values \
 		--wait \
@@ -453,7 +373,7 @@ helm-observability:
 		--history-max 3 \
 		--set observability.tracing.enabled=true \
 		--set observability.monitoring.enabled=true
-	helm upgrade --install $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
+	helm upgrade --install $(HELM_SERVICES_RELEASE) $(HELM_SERVICES_CHART) \
 		--namespace $(HELM_APP_NAMESPACE) \
 		--reuse-values \
 		--wait \
@@ -467,32 +387,33 @@ helm-observability:
 helm-prod-like: helm-operators helm-platform helm-schema-registry helm-apps helm-observability
 
 # Apply dev plus explicit tracing profile.
-helm-tracing: helm-vault-token-source
-	helm upgrade --install $(HELM_ADMIN_RELEASE) $(HELM_ADMIN_CHART) \
+helm-tracing: helm-infisical-auth-secret
+	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--create-namespace \
 		--history-max 3 \
-		--values infra/helm/values-observability-tracing.yaml
+		--set observability.tracing.enabled=true
 
 # Apply the load-test profile.
-helm-load: helm-vault-token-source
-	helm upgrade --install $(HELM_APP_RELEASE) $(HELM_APP_CHART) \
+helm-load: helm-infisical-auth-secret
+	helm upgrade --install $(HELM_SERVICES_RELEASE) $(HELM_SERVICES_CHART) \
 		--namespace $(HELM_APP_NAMESPACE) \
 		--create-namespace \
-		--history-max 3 \
-		--values infra/helm/values-load-test.yaml
+		--history-max 3
 
 # Remove the Helm releases. Namespace cleanup is intentionally separate so PVCs
 # are not deleted accidentally by a short command.
 helm-delete:
-	helm uninstall $(HELM_APP_RELEASE) --namespace $(HELM_APP_NAMESPACE) --ignore-not-found
-	helm uninstall $(HELM_ADMIN_RELEASE) --namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
+	helm uninstall $(HELM_SERVICES_RELEASE) --namespace $(HELM_APP_NAMESPACE) --ignore-not-found
+	helm uninstall $(HELM_PLATFORM_RUNTIME_RELEASE) --namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
+	helm uninstall $(HELM_PLATFORM_SYSTEM_RELEASE) --namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
 
 # Remove the application release, namespaces and platform operators installed
 # through manual Helm targets.
 helm-delete-all:
-	helm uninstall $(HELM_APP_RELEASE) --namespace $(HELM_APP_NAMESPACE) --ignore-not-found
-	helm uninstall $(HELM_ADMIN_RELEASE) --namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
+	helm uninstall $(HELM_SERVICES_RELEASE) --namespace $(HELM_APP_NAMESPACE) --ignore-not-found
+	helm uninstall $(HELM_PLATFORM_RUNTIME_RELEASE) --namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
+	helm uninstall $(HELM_PLATFORM_SYSTEM_RELEASE) --namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
 	kubectl delete namespace $(HELM_APP_NAMESPACE) --ignore-not-found
 	kubectl delete namespace $(HELM_PLATFORM_NAMESPACE) --ignore-not-found
 	helm uninstall external-secrets --namespace external-secrets --ignore-not-found

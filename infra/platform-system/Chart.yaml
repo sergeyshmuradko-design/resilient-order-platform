@@ -1,0 +1,6 @@
+apiVersion: v2
+name: resilient-orders-platform-system
+description: Platform-system chart for Argo CD projects, Infisical secrets and Gateway entry points.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

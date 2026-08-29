@@ -1,0 +1,397 @@
+# Services is the application delivery layer owned by service developers.
+# It contains service Deployments, service routes, application namespace
+# guardrails and service-owned runtime declarations such as Kafka topics.
+#
+# Defaults stay intentionally small because the local Codespaces cluster is used
+# for a few manual checks, not for continuous production traffic.
+
+nameOverride: ""
+fullnameOverride: ""
+
+labels:
+  # Kubernetes recommended "app.kubernetes.io/part-of" value. It lets Argo CD,
+  # kubectl and observability tools group every resource by the same product.
+  partOf: resilient-order-platform
+
+imagePullSecrets: []
+
+platform:
+  namespace: resilient-orders-platform
+  postgresHost: postgres.resilient-orders-platform.svc.cluster.local
+  rabbitmqHost: rabbitmq.resilient-orders-platform.svc.cluster.local
+  redisHost: redis.resilient-orders-platform.svc.cluster.local
+  schemaRegistryUrl: http://schema-registry.resilient-orders-platform.svc.cluster.local:8081
+  jaegerOtlpHttpUrl: http://jaeger.resilient-orders-platform.svc.cluster.local:4318/v1/traces
+
+guardrails:
+  enabled: true
+  quota:
+    requestsCpu: 1000m
+    requestsMemory: 2Gi
+    limitsCpu: 4000m
+    limitsMemory: 4Gi
+    requestsStorage: 3Gi
+    persistentVolumeClaims: "8"
+    pods: "32"
+  limitRange:
+    defaultRequestCpu: 25m
+    defaultRequestMemory: 64Mi
+    defaultCpu: 250m
+    defaultMemory: 256Mi
+    maxCpu: 750m
+    maxMemory: 512Mi
+
+config:
+  postgresDb: orders_db
+  postgresUser: orders_user
+  postgresExporterUser: postgres_exporter
+  orderServiceDbOwnerUser: order_service_owner
+  orderServiceDbUser: order_service_app
+  notificationServiceDbOwnerUser: notification_service_owner
+  notificationServiceDbUser: notification_service_app
+  rabbitmqHost: rabbitmq
+  rabbitmqPort: "5672"
+
+exposure:
+  # Default keeps Services internal. Browser/API access is handled by Gateway API
+  # in local/prod-like profiles instead of exposing many LoadBalancer Services.
+  orderService:
+    type: ClusterIP
+  prometheus:
+    type: ClusterIP
+    port: 9090
+  grafana:
+    type: ClusterIP
+    port: 3000
+
+routes:
+  enabled: true
+  gatewayName: platform-gateway
+  gatewayNamespace: resilient-orders-platform
+  hosts:
+    paymentService: payment.localhost
+    orderService: order.localhost
+    notificationService: notification.localhost
+
+secrets:
+  # Application namespace copies of secrets from the Infisical-backed
+  # ClusterSecretStore. Runtime Pods and migration Jobs get different Kubernetes
+  # Secrets so the long-running application containers cannot read database
+  # owner credentials.
+  external:
+    refreshInterval: 1m
+    storeName: infisical-cluster-store
+  runtime:
+    targetName: runtime-secrets
+    keys:
+      - ORDER_SERVICE_DB_PASSWORD
+      - NOTIFICATION_SERVICE_DB_PASSWORD
+      - JWT_SECRET
+      - ORDER_SERVICE_RABBITMQ_USERNAME
+      - ORDER_SERVICE_RABBITMQ_PASSWORD
+      - NOTIFICATION_SERVICE_RABBITMQ_USERNAME
+      - NOTIFICATION_SERVICE_RABBITMQ_PASSWORD
+      - ORDER_SERVICE_ADMIN_USERNAME
+      - ORDER_SERVICE_ADMIN_PASSWORD
+      - ORDER_SERVICE_USER_USERNAME
+      - ORDER_SERVICE_USER_PASSWORD
+  migration:
+    targetName: migration-secrets
+    keys:
+      - ORDER_SERVICE_DB_OWNER_PASSWORD
+      - NOTIFICATION_SERVICE_DB_OWNER_PASSWORD
+
+serviceOwnerRbac:
+  enabled: true
+  # Placeholder for a future OIDC/SSO group in the real cluster. Kubernetes
+  # itself does not create this group; the API server receives it from the
+  # identity provider configured for developers.
+  groupName: resilient-orders:service-developers
+
+rabbitmqTopology:
+  enabled: true
+  clusterName: rabbitmq
+  clusterNamespace: resilient-orders-platform
+  vhost: /
+  users:
+    - name: order-service-rabbitmq-user
+      credentialsSecretName: order-service-rabbitmq-credentials
+      usernameSecretKey: ORDER_SERVICE_RABBITMQ_USERNAME
+      passwordSecretKey: ORDER_SERVICE_RABBITMQ_PASSWORD
+      tags: []
+      permissions:
+        configure: "^$"
+        write: "^order\\.exchange$"
+        read: "^$"
+    - name: notification-service-rabbitmq-user
+      credentialsSecretName: notification-service-rabbitmq-credentials
+      usernameSecretKey: NOTIFICATION_SERVICE_RABBITMQ_USERNAME
+      passwordSecretKey: NOTIFICATION_SERVICE_RABBITMQ_PASSWORD
+      tags: []
+      permissions:
+        configure: "^$"
+        write: "^$"
+        read: "^order\\.created\\.queue$"
+  exchanges:
+    - resourceName: order-exchange
+      name: order.exchange
+      type: direct
+      durable: true
+      autoDelete: false
+    - resourceName: order-dlx
+      name: order.dlx
+      type: direct
+      durable: true
+      autoDelete: false
+  queues:
+    - resourceName: order-created-queue
+      name: order.created.queue
+      durable: true
+      autoDelete: false
+      deletionPolicy: delete
+    - resourceName: order-created-dlq
+      name: order.created.dlx
+      durable: true
+      autoDelete: false
+      deletionPolicy: delete
+  policies:
+    # Runtime queue behaviour is managed with RabbitMQ policies instead of
+    # hardcoded queue x-arguments. TTL, length limits and DLX routing can then
+    # be changed without deleting/redeclaring queues.
+    - resourceName: order-created-queue-policy
+      name: order-created-queue-policy
+      pattern: "^order\\.created\\.queue$"
+      applyTo: queues
+      priority: 10
+      definition:
+        dead-letter-exchange: order.dlx
+        dead-letter-routing-key: order.created.dlq
+        message-ttl: 300000
+        max-length: 1000
+    - resourceName: order-created-dlq-policy
+      name: order-created-dlq-policy
+      pattern: "^order\\.created\\.dlx$"
+      applyTo: queues
+      priority: 10
+      definition:
+        message-ttl: 300000
+        max-length: 1000
+  bindings:
+    - resourceName: order-created-binding
+      source: order.exchange
+      destination: order.created.queue
+      destinationType: queue
+      routingKey: order.created
+      arguments: {}
+    - resourceName: order-created-dlq-binding
+      source: order.dlx
+      destination: order.created.dlx
+      destinationType: queue
+      routingKey: order.created.dlq
+      arguments: {}
+
+components:
+  postgres:
+    enabled: false
+    image: postgres:16
+    storage: 512Mi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  redis:
+    enabled: false
+    image: redis:7
+    maxmemory: 32mb
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+  rabbitmq:
+    enabled: false
+    image: rabbitmq:3-management
+    storage: 512Mi
+    messageTtlMs: 300000
+    maxQueueLength: 1000
+    diskFreeLimitBytes: "134217728"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  kafka:
+    enabled: false
+    # Kafka is managed by Strimzi. This keeps Kafka lifecycle, listeners,
+    # KRaft metadata, broker identity, topic management and generated Services
+    # in the operator instead of hand-written Deployment environment variables.
+    clusterName: resilient-kafka
+    nodePoolName: dual-role
+    version: 4.3.0
+    metadataVersion: 4.3-IV0
+    replicas: 1
+    storage: 512Mi
+    deleteClaim: true
+    heap:
+      xms: 128m
+      xmx: 256m
+    logRetentionMs: "120000"
+    logRetentionBytes: "67108864"
+    logSegmentBytes: "16777216"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 320Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    topics:
+      # Service-owned topic contracts. Strimzi reconciles these declarative
+      # KafkaTopic resources when Kafka is enabled in the platform runtime.
+      - name: order.created.events
+        partitions: 1
+        replicas: 1
+        config:
+          retention.ms: "300000"
+          segment.bytes: "8388608"
+          cleanup.policy: delete
+      - name: order.created.events.avro
+        partitions: 1
+        replicas: 1
+        config:
+          retention.ms: "300000"
+          segment.bytes: "8388608"
+          cleanup.policy: delete
+      - name: order.created.events.DLT
+        partitions: 1
+        replicas: 1
+        config:
+          retention.ms: "300000"
+          segment.bytes: "8388608"
+          cleanup.policy: delete
+  schemaRegistry:
+    enabled: false
+    image: confluentinc/cp-schema-registry:8.3.0
+    heapOpts: -Xms64m -Xmx128m
+    resources:
+      requests:
+        cpu: 50m
+        memory: 160Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  paymentService:
+    enabled: true
+    # Pin services by immutable image digest. Mutable tags such as main/latest
+    # are convenient locally, but production-style GitOps should deploy an exact
+    # artifact so rollback and audit both point to a real image.
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/payment-service@sha256:20f7cda3244922ff55bc06e9fb0aee1e5193d1a0e40bee0f3a13d8ccdcb61608
+    imagePullPolicy: IfNotPresent
+    port: 8082
+    javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  orderService:
+    enabled: false
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/order-service@sha256:6199952cef1465d39a3a81ffb626f232f6458c99a6a8da849135a1ef19dee13f
+    migrationImage: resilient-orders/order-service-migrations:local
+    imagePullPolicy: IfNotPresent
+    port: 8081
+    springProfiles: docker
+    javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
+    resources:
+      requests:
+        cpu: 50m
+        memory: 192Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+  notificationService:
+    enabled: false
+    image: ghcr.io/sergeyshmuradko-design/resilient-order-platform/notification-service@sha256:4a74f3e36064961261db9bf0007f552cc10c6eba1610b188c77d4f103d20b582
+    migrationImage: resilient-orders/notification-service-migrations:local
+    imagePullPolicy: IfNotPresent
+    port: 8083
+    javaToolOptions: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30
+    resources:
+      requests:
+        cpu: 40m
+        memory: 160Mi
+      limits:
+        cpu: 400m
+        memory: 320Mi
+
+observability:
+  tracing:
+    enabled: false
+    image: jaegertracing/all-in-one:1.60
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  monitoring:
+    enabled: false
+    postgresExporter:
+      image: prometheuscommunity/postgres-exporter:v0.20.1
+      resources:
+        requests:
+          cpu: 25m
+          memory: 48Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+    prometheus:
+      image: prom/prometheus
+      retentionTime: 30m
+      retentionSize: 256MB
+      emptyDirSizeLimit: 256Mi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 256Mi
+    grafana:
+      image: grafana/grafana
+      emptyDirSizeLimit: 128Mi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 256Mi
+
+migrations:
+  enabled: false
+  ttlSecondsAfterFinished: 300
+  connectRetries: 60
+  services:
+    - name: order-service
+      enabled: true
+      imageKey: orderService
+      schema: order_service
+      ownerUserConfigKey: ORDER_SERVICE_DB_OWNER_USER
+      ownerPasswordSecretKey: ORDER_SERVICE_DB_OWNER_PASSWORD
+    - name: notification-service
+      enabled: true
+      imageKey: notificationService
+      schema: notification_service
+      ownerUserConfigKey: NOTIFICATION_SERVICE_DB_OWNER_USER
+      ownerPasswordSecretKey: NOTIFICATION_SERVICE_DB_OWNER_PASSWORD

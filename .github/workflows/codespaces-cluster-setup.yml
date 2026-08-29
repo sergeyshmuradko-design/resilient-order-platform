@@ -1,0 +1,141 @@
+name: Codespaces Cluster Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Choose whether to plan, apply or destroy the local Codespaces cluster setup."
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+
+jobs:
+  authorize-admin:
+    name: Authorize repository admin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check actor repository permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          permission="$(gh api "repos/${REPOSITORY}/collaborators/${ACTOR}/permission" --jq .permission)"
+
+          if [ "$permission" != "admin" ]; then
+            echo "::error::${ACTOR} has '${permission}' permission, but this Terraform workflow requires repository admin permission."
+            exit 1
+          fi
+
+          echo "${ACTOR} is authorized with repository admin permission."
+
+  terraform:
+    needs: authorize-admin
+    # This workflow is intentionally bound to a self-hosted runner. GitHub-hosted
+    # runners cannot reach open Codespaces Docker daemon/kubeconfig.
+    runs-on: [self-hosted, codespaces, k3d, resilient-orders]
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      # GitHub Actions does not reliably inherit shell exports from the script
+      # that registered the self-hosted runner. Keep the marker path explicit so
+      # the runner start script can prune the same local directory after destroy.
+      RUNNER_DIR: /workspaces/resilient-order-platform/.local/github-runner
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Local Codespaces uses Terraform local state in the checked-out tree.
+          # Keep untracked tfstate files between manual workflow runs so a later
+          # destroy run can see what the apply run created. A real cloud setup
+          # should replace this with a remote backend.
+          clean: false
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Terraform fmt
+        run: terraform -chdir=infra/terraform fmt -check -recursive
+
+      - name: Codespaces Terraform init
+        run: terraform -chdir=infra/terraform/codespaces init
+
+      - name: Platform Terraform init
+        run: terraform -chdir=infra/terraform/platform init
+
+      - name: Codespaces Terraform validate
+        run: terraform -chdir=infra/terraform/codespaces validate
+
+      - name: Platform Terraform validate
+        run: terraform -chdir=infra/terraform/platform validate
+
+      - name: Codespaces Terraform plan
+        if: ${{ inputs.mode == 'plan' || inputs.mode == 'apply' }}
+        run: terraform -chdir=infra/terraform/codespaces plan -out=tfplan
+
+      - name: Codespaces Terraform apply
+        if: ${{ inputs.mode == 'apply' }}
+        run: terraform -chdir=infra/terraform/codespaces apply -auto-approve tfplan
+
+      - name: Check Infisical settings
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          INFISICAL_PROJECT_SLUG: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
+          INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
+        run: |
+          test -n "$INFISICAL_PROJECT_SLUG" || { echo "::error::Set repository variable INFISICAL_PROJECT_SLUG."; exit 1; }
+          test -n "$INFISICAL_UNIVERSAL_AUTH_CLIENT_ID" || { echo "::error::Set repository secret INFISICAL_UNIVERSAL_AUTH_CLIENT_ID."; exit 1; }
+          test -n "$INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET" || { echo "::error::Set repository secret INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET."; exit 1; }
+
+      - name: Platform Terraform plan
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          TF_VAR_repository_url: ${{ github.server_url }}/${{ github.repository }}.git
+          TF_VAR_target_revision: ${{ github.ref_name }}
+          TF_VAR_infisical_host_api: ${{ vars.INFISICAL_HOST_API || 'https://app.infisical.com' }}
+          TF_VAR_infisical_project_slug: ${{ vars.INFISICAL_PROJECT_SLUG || 'replace-me' }}
+          TF_VAR_infisical_environment_slug: ${{ vars.INFISICAL_ENVIRONMENT_SLUG || 'dev' }}
+          TF_VAR_infisical_secrets_path: ${{ vars.INFISICAL_SECRETS_PATH || '/' }}
+          TF_VAR_infisical_client_id: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
+          TF_VAR_infisical_client_secret: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
+        run: terraform -chdir=infra/terraform/platform plan -out=tfplan
+
+      - name: Platform Terraform apply
+        if: ${{ inputs.mode == 'apply' }}
+        run: terraform -chdir=infra/terraform/platform apply -auto-approve tfplan
+
+      - name: Platform Terraform destroy
+        if: ${{ inputs.mode == 'destroy' }}
+        env:
+          TF_VAR_repository_url: ${{ github.server_url }}/${{ github.repository }}.git
+          TF_VAR_target_revision: ${{ github.ref_name }}
+          TF_VAR_infisical_host_api: ${{ vars.INFISICAL_HOST_API || 'https://app.infisical.com' }}
+          TF_VAR_infisical_project_slug: ${{ vars.INFISICAL_PROJECT_SLUG || 'replace-me' }}
+          TF_VAR_infisical_environment_slug: ${{ vars.INFISICAL_ENVIRONMENT_SLUG || 'dev' }}
+          TF_VAR_infisical_secrets_path: ${{ vars.INFISICAL_SECRETS_PATH || '/' }}
+          TF_VAR_infisical_client_id: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
+          TF_VAR_infisical_client_secret: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
+        run: terraform -chdir=infra/terraform/platform destroy -auto-approve
+
+      - name: Codespaces Terraform destroy
+        if: ${{ inputs.mode == 'destroy' }}
+        run: terraform -chdir=infra/terraform/codespaces destroy -auto-approve
+
+      - name: Mark local runner workspace for pruning
+        if: ${{ inputs.mode == 'destroy' && success() }}
+        run: |
+          test -n "$RUNNER_DIR"
+          mkdir -p "$RUNNER_DIR"
+          touch "$RUNNER_DIR/.destroy-succeeded"

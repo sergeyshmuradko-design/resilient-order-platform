@@ -1,0 +1,152 @@
+{{- if .Values.policy.kyverno.enabled }}
+# Kyverno policy guardrails.
+#
+# These ClusterPolicies are intentionally owned by the platform-system layer:
+# service teams can define workloads/topology, while platform/security defines
+# the rules that make unsafe manifests visible or blocked. The default action is
+# Audit in values.yaml so the first local run reports violations without
+# rejecting resources. Switch to Enforce only after the reports are clean.
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: resilient-orders-application-runtime-guardrails
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "kyverno-application-runtime" "component" "policy") | nindent 4 }}
+spec:
+  validationFailureAction: {{ .Values.policy.kyverno.validationFailureAction | quote }}
+  background: true
+  rules:
+    - name: application-deployments-must-not-declare-rabbitmq-topology
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - {{ .Values.namespaces.application | quote }}
+      validate:
+        message: "Application Deployments must keep SPRING_RABBITMQ_DYNAMIC=false; RabbitMQ topology is owned by Messaging Topology Operator."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: "*"
+                    env:
+                      - name: SPRING_RABBITMQ_DYNAMIC
+                        value: "false"
+    - name: application-deployments-must-not-run-flyway
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - {{ .Values.namespaces.application | quote }}
+      validate:
+        message: "Application Deployments must keep SPRING_FLYWAY_ENABLED=false; database migrations are owned by dedicated migration Jobs."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: "*"
+                    env:
+                      - name: SPRING_FLYWAY_ENABLED
+                        value: "false"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: resilient-orders-disallow-rabbitmq-queue-arguments
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "kyverno-rabbitmq-queue-arguments" "component" "policy") | nindent 4 }}
+spec:
+  validationFailureAction: {{ .Values.policy.kyverno.validationFailureAction | quote }}
+  background: true
+  rules:
+    - name: use-policies-instead-of-queue-arguments
+      match:
+        any:
+          - resources:
+              kinds:
+                - rabbitmq.com/v1beta1/Queue
+              namespaces:
+                - {{ .Values.namespaces.application | quote }}
+      validate:
+        message: "RabbitMQ Queue.spec.arguments is not allowed here; use RabbitMQ Policy CRs for runtime queue behaviour such as TTL, limits and DLX."
+        pattern:
+          spec:
+            X(arguments): "null"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: resilient-orders-basic-workload-standards
+  labels:
+    {{- include "resilient-orders.componentLabels" (dict "root" . "name" "kyverno-workload-standards" "component" "policy") | nindent 4 }}
+spec:
+  validationFailureAction: {{ .Values.policy.kyverno.validationFailureAction | quote }}
+  background: true
+  rules:
+    - name: disallow-latest-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - {{ .Values.namespaces.application | quote }}
+                - {{ .Values.namespaces.platform | quote }}
+      validate:
+        message: "Container images must not use the mutable latest tag; pin an immutable version or digest."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: "!*:latest"
+    - name: disallow-main-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - {{ .Values.namespaces.application | quote }}
+                - {{ .Values.namespaces.platform | quote }}
+      validate:
+        message: "Container images must not use the mutable main tag; pin an immutable version or digest."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: "!*:main"
+    - name: require-container-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - Job
+              namespaces:
+                - {{ .Values.namespaces.application | quote }}
+                - {{ .Values.namespaces.platform | quote }}
+      validate:
+        message: "Containers must define CPU/memory requests and limits."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - resources:
+                      requests:
+                        cpu: "?*"
+                        memory: "?*"
+                      limits:
+                        cpu: "?*"
+                        memory: "?*"
+{{- end }}

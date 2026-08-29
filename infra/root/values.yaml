@@ -1,0 +1,101 @@
+repositoryUrl: ""
+targetRevision: main
+
+namespaces:
+  argocd: argocd
+  platform: resilient-orders-platform
+  application: resilient-orders
+  externalSecrets: external-secrets
+  rabbitmqOperator: rabbitmq-system
+  nginxGateway: nginx-gateway
+  strimzi: strimzi-system
+  kyverno: kyverno-system
+
+containerImagePrefix: ghcr.io/sergeyshmuradko-design/resilient-order-platform
+
+operators:
+  project: resilient-orders-platform-operators
+  externalSecrets:
+    enabled: true
+    applicationName: resilient-orders-external-secrets
+    namespace: external-secrets
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 2.8.0
+  rabbitmq:
+    enabled: true
+    applicationName: resilient-orders-rabbitmq-operator
+    namespace: rabbitmq-system
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: rabbitmq-cluster-operator
+    targetRevision: 4.4.34
+  gatewayApiCrds:
+    enabled: true
+    applicationName: resilient-orders-gateway-api-crds
+    repoURL: https://github.com/nginx/nginx-gateway-fabric.git
+    path: config/crd/gateway-api/standard
+    targetRevision: v2.6.7
+  nginxGateway:
+    enabled: true
+    applicationName: resilient-orders-nginx-gateway
+    namespace: nginx-gateway
+    repoURL: ghcr.io/nginx/charts
+    chart: nginx-gateway-fabric
+    targetRevision: 2.6.7
+  strimzi:
+    enabled: false
+    applicationName: resilient-orders-strimzi
+    namespace: strimzi-system
+    repoURL: quay.io/strimzi-helm
+    chart: strimzi-kafka-operator
+    targetRevision: 1.1.0
+  kyverno:
+    enabled: false
+    applicationName: resilient-orders-kyverno
+    namespace: kyverno-system
+    repoURL: https://kyverno.github.io/kyverno
+    chart: kyverno
+    targetRevision: 3.5.2
+
+secrets:
+  external:
+    storeName: infisical-cluster-store
+    infisical:
+      hostAPI: https://app.infisical.com
+      projectSlug: replace-me
+      environmentSlug: dev
+      secretsPath: /
+      clientId: replace-me
+      clientSecret: replace-me
+      authSecretName: infisical-universal-auth
+      authSecretNamespace: external-secrets
+
+sync:
+  automated:
+    prune: true
+    selfHeal: true
+
+layers:
+  platformSystem:
+    enabled: true
+    wave: "-20"
+    applicationName: resilient-orders-platform-system
+    project: resilient-orders-platform-system
+    releaseName: resilient-orders-platform-system
+    path: infra/platform-system
+  platformRuntime:
+    enabled: true
+    wave: "-10"
+    applicationName: resilient-orders-platform-runtime
+    project: resilient-orders-platform-runtime
+    releaseName: resilient-orders-platform-runtime
+    path: infra/platform-runtime
+  services:
+    enabled: true
+    wave: "0"
+    applicationName: resilient-orders-services
+    project: resilient-orders-services
+    releaseName: resilient-orders-services
+    path: infra/services
+    imageUpdater:
+      enabled: false

@@ -31,14 +31,8 @@ runner_version="${RUNNER_VERSION:-2.334.0}"
 export RUNNER_DIR="${runner_dir}"
 export RUNNER_VERSION="${runner_version}"
 
-# Terraform runs inside the self-hosted runner checkout, where `.env` is not
-# committed. Export the local workspace path so Terraform can seed local Vault
-# from the developer-only `.env` file during the Codespaces bootstrap.
-export TF_VAR_local_env_file="${TF_VAR_local_env_file:-${workspace_dir}/.env}"
-
 echo "Repository: ${repo}"
 echo "Runner version: ${runner_version}"
-echo "Terraform local env file: ${TF_VAR_local_env_file}"
 
 token="${RUNNER_TOKEN:-}"
 if [ -z "${token}" ] && command -v gh >/dev/null 2>&1; then

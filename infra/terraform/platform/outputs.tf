@@ -4,7 +4,7 @@ output "argocd_namespace" {
 }
 
 output "platform_namespace" {
-  description = "Namespace where the initial PostgreSQL/Vault platform slice is reconciled."
+  description = "Namespace where the initial PostgreSQL platform slice is reconciled."
   value       = var.platform_namespace
 }
 

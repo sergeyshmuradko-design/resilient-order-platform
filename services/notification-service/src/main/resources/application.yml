@@ -63,6 +63,9 @@ spring:
     user: ${NOTIFICATION_SERVICE_DB_OWNER_USER}
 
   rabbitmq:
+    # RabbitMQ topology is owned by Kubernetes Messaging Topology Operator.
+    # Spring must not auto-declare exchanges, queues or bindings at startup.
+    dynamic: false
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
 
@@ -104,6 +107,8 @@ management:
         include: health,prometheus
   endpoint:
     health:
+      probes:
+        enabled: true
       # Позже здесь увидим состояние DB, Redis, RabbitMQ и Kafka,
       # если соответствующие health indicators доступны.
       show-details: when-authorized
