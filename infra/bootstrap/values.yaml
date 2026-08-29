@@ -34,7 +34,7 @@ secrets:
       clientId: replace-me
       clientSecret: replace-me
       authSecretName: infisical-universal-auth
-      authSecretNamespace: external-secrets
+      authSecretNamespace: argocd
 
 root:
   projectName: resilient-orders-root

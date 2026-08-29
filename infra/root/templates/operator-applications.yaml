@@ -68,6 +68,7 @@ spec:
       selfHeal: {{ .Values.sync.automated.selfHeal }}
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
 ---

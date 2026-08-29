@@ -3,6 +3,13 @@ kind: AppProject
 metadata:
   name: {{ .Values.root.projectName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    # Keep the root AppProject during Helm uninstall so the root Application can
+    # still pass Argo CD project validation while its finalizer prunes child
+    # Applications. The next bootstrap install uses the same release/name, so
+    # Helm can continue managing this object; a full k3d destroy removes it with
+    # the cluster anyway.
+    helm.sh/resource-policy: keep
 spec:
   description: Bootstrap project for the root app-of-apps Application.
   sourceRepos:

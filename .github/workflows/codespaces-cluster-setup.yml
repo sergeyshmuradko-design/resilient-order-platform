@@ -1,4 +1,4 @@
-name: Codespaces Cluster Setup
+name: codespaces-cluster-setup
 
 on:
   workflow_dispatch:
