@@ -20,7 +20,7 @@ resource "helm_release" "argocd" {
   create_namespace = true
 
   wait    = true
-  timeout = 300
+  timeout = 600
 
   values = [
     yamlencode({
@@ -90,6 +90,10 @@ resource "helm_release" "argocd" {
     value = "false"
   }
   set {
+    name  = "applicationSet.replicas"
+    value = "0"
+  }
+  set {
     name  = "notifications.enabled"
     value = "false"
   }
@@ -123,11 +127,11 @@ resource "helm_release" "argocd" {
   }
   set {
     name  = "repoServer.resources.requests.memory"
-    value = "128Mi"
+    value = "192Mi"
   }
   set {
     name  = "repoServer.resources.limits.memory"
-    value = "384Mi"
+    value = "768Mi"
   }
   set {
     name  = "redis.resources.requests.cpu"
@@ -156,7 +160,7 @@ resource "helm_release" "gitops_bootstrap" {
   create_namespace = true
 
   wait    = true
-  timeout = 300
+  timeout = 600
 
   set {
     name  = "repositoryUrl"
@@ -248,7 +252,7 @@ resource "helm_release" "gitops_bootstrap" {
   }
   set {
     name  = "secrets.external.infisical.authSecretNamespace"
-    value = var.external_secrets_namespace
+    value = var.argocd_namespace
   }
 
   depends_on = [helm_release.argocd]

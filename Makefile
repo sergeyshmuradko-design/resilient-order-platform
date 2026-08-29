@@ -19,8 +19,6 @@ HELM_PLATFORM_RUNTIME_CHART = infra/platform-runtime
 HELM_SERVICES_CHART = infra/services
 HELM_ADMIN_CHART = $(HELM_PLATFORM_RUNTIME_CHART)
 HELM_APP_CHART = $(HELM_SERVICES_CHART)
-HELM_INFISICAL_CLIENT_ID ?= replace-me
-HELM_INFISICAL_CLIENT_SECRET ?= replace-me
 K3D_CLUSTER = resilient-orders
 STRIMZI_NAMESPACE = strimzi-system
 NGINX_GATEWAY_NAMESPACE = nginx-gateway
@@ -226,11 +224,11 @@ helm-operators: helm-external-secrets helm-strimzi-operator helm-nginx-gateway
 
 # Compatibility target for older local notes.
 #
-# Infisical Universal Auth is rendered by the platform-system chart. This target
-# stays as a compatibility no-op because the credentials are passed as Helm
-# values, not created by a separate kubectl command.
+# GitOps creates the Infisical Universal Auth Secret from the Terraform-owned
+# bootstrap chart. Manual Helm targets do not create or pass those credentials
+# anymore; create the Secret yourself before using manual Helm deployment.
 helm-infisical-auth-secret:
-	@echo "Infisical Universal Auth is rendered by infra/platform-system; no standalone Secret command is needed."
+	@echo "GitOps bootstrap owns the Infisical auth Secret. For manual Helm usage, create it in the configured authSecretNamespace first."
 
 # Run platform-owned database provisioning once secrets are available.
 helm-db-provision:
@@ -299,9 +297,7 @@ helm-dev: helm-infisical-auth-secret
 	helm upgrade --install $(HELM_PLATFORM_SYSTEM_RELEASE) $(HELM_PLATFORM_SYSTEM_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--create-namespace \
-		--history-max 3 \
-		--set secrets.external.infisical.clientId="$(HELM_INFISICAL_CLIENT_ID)" \
-		--set secrets.external.infisical.clientSecret="$(HELM_INFISICAL_CLIENT_SECRET)"
+		--history-max 3
 	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--create-namespace \
@@ -333,9 +329,7 @@ helm-platform: helm-infisical-auth-secret
 		--create-namespace \
 		--wait \
 		--timeout 8m \
-		--history-max 3 \
-		--set secrets.external.infisical.clientId="$(HELM_INFISICAL_CLIENT_ID)" \
-		--set secrets.external.infisical.clientSecret="$(HELM_INFISICAL_CLIENT_SECRET)"
+		--history-max 3
 	helm upgrade --install $(HELM_PLATFORM_RUNTIME_RELEASE) $(HELM_PLATFORM_RUNTIME_CHART) \
 		--namespace $(HELM_PLATFORM_NAMESPACE) \
 		--create-namespace \

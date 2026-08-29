@@ -150,10 +150,8 @@ secrets:
       projectSlug: replace-me
       environmentSlug: dev
       secretsPath: /
-      clientId: replace-me
-      clientSecret: replace-me
       authSecretName: infisical-universal-auth
-      authSecretNamespace: external-secrets
+      authSecretNamespace: argocd
 
 components:
   postgres:

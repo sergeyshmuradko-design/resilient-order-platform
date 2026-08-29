@@ -55,10 +55,6 @@ spec:
           value: {{ .Values.secrets.external.infisical.environmentSlug | quote }}
         - name: secrets.external.infisical.secretsPath
           value: {{ .Values.secrets.external.infisical.secretsPath | quote }}
-        - name: secrets.external.infisical.clientId
-          value: {{ .Values.secrets.external.infisical.clientId | quote }}
-        - name: secrets.external.infisical.clientSecret
-          value: {{ .Values.secrets.external.infisical.clientSecret | quote }}
         - name: secrets.external.infisical.authSecretName
           value: {{ .Values.secrets.external.infisical.authSecretName | quote }}
         - name: secrets.external.infisical.authSecretNamespace
