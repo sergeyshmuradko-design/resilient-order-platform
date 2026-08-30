@@ -11,19 +11,31 @@ resilient-orders-root -> infra/root
 The root chart creates named Argo CD projects and child Applications:
 
 ```text
-resilient-orders-external-secrets    -> External Secrets Operator
-resilient-orders-gateway-api-crds    -> Gateway API CRDs
-resilient-orders-nginx-gateway       -> NGINX Gateway Fabric
-resilient-orders-rabbitmq-operator   -> RabbitMQ Cluster/Topology operators
+resilient-orders-external-secrets    -> External Secrets Operator, enabled by default
+resilient-orders-gateway-api-crds    -> Gateway API CRDs, enabled by default
+resilient-orders-nginx-gateway       -> NGINX Gateway Fabric, enabled by default
+resilient-orders-cert-manager        -> cert-manager, disabled by default
+resilient-orders-rabbitmq-operator   -> RabbitMQ Cluster/Topology operators, disabled by default
 resilient-orders-kyverno             -> Kyverno policy engine, disabled by default
 resilient-orders-platform-system   -> infra/platform-system
 resilient-orders-platform-runtime  -> infra/platform-runtime
-resilient-orders-services          -> infra/services
+resilient-orders-services          -> infra/services, disabled by default for local bootstrap
 ```
 
 Operator enable/disable switches are owned here, in `infra/root/values.yaml`.
 Terraform only creates the root handoff and passes shared bootstrap settings
 such as repository URL, target revision, namespaces and pinned chart versions.
+
+The workflow can override the root switches without a Git commit by passing
+Terraform variables into the bootstrap chart. The smallest local profile keeps
+RabbitMQ and cert-manager disabled; `enable_rabbitmq_stack=true` enables the
+RabbitMQ operators, the RabbitMQ runtime cluster and service-owned RabbitMQ
+topology together.
+
+External Secrets, Gateway API/NGINX Gateway, platform-system and
+platform-runtime are treated as required platform pieces. Runtime dependencies
+and applications are the selectable part: PostgreSQL, Redis, RabbitMQ stack,
+Strimzi, Kyverno and each service can be enabled from workflow inputs.
 
 Kyverno is disabled by default to keep the local Codespaces slice small. Enable
 it by setting:

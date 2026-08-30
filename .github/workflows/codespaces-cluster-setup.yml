@@ -12,6 +12,51 @@ on:
           - plan
           - apply
           - destroy
+      enable_cert_manager:
+        description: "Install cert-manager. RabbitMQ topology enables it automatically because its webhook needs certificates."
+        required: true
+        type: boolean
+        default: false
+      enable_postgres:
+        description: "Deploy PostgreSQL in the platform-runtime layer."
+        required: true
+        type: boolean
+        default: true
+      enable_redis:
+        description: "Deploy Redis in the platform-runtime layer."
+        required: true
+        type: boolean
+        default: true
+      enable_rabbitmq_stack:
+        description: "Install RabbitMQ operators, RabbitMQ runtime cluster and service RabbitMQ topology."
+        required: true
+        type: boolean
+        default: false
+      enable_strimzi:
+        description: "Install Strimzi Kafka Operator."
+        required: true
+        type: boolean
+        default: false
+      enable_kyverno:
+        description: "Install Kyverno policy engine."
+        required: true
+        type: boolean
+        default: false
+      enable_payment_service:
+        description: "Deploy payment-service."
+        required: true
+        type: boolean
+        default: false
+      enable_order_service:
+        description: "Deploy order-service."
+        required: true
+        type: boolean
+        default: false
+      enable_notification_service:
+        description: "Deploy notification-service."
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -110,6 +155,15 @@ jobs:
           TF_VAR_infisical_secrets_path: ${{ vars.INFISICAL_SECRETS_PATH || '/' }}
           TF_VAR_infisical_client_id: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
           TF_VAR_infisical_client_secret: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
+          TF_VAR_enable_cert_manager_operator: ${{ inputs.enable_cert_manager || inputs.enable_rabbitmq_stack }}
+          TF_VAR_enable_rabbitmq_operator: ${{ inputs.enable_rabbitmq_stack }}
+          TF_VAR_enable_strimzi_operator: ${{ inputs.enable_strimzi }}
+          TF_VAR_enable_kyverno_operator: ${{ inputs.enable_kyverno }}
+          TF_VAR_enable_postgres: ${{ inputs.enable_postgres }}
+          TF_VAR_enable_redis: ${{ inputs.enable_redis }}
+          TF_VAR_enable_payment_service: ${{ inputs.enable_payment_service }}
+          TF_VAR_enable_order_service: ${{ inputs.enable_order_service }}
+          TF_VAR_enable_notification_service: ${{ inputs.enable_notification_service }}
         run: terraform -chdir=infra/terraform/platform plan -out=tfplan
 
       - name: Platform Terraform apply
@@ -127,6 +181,15 @@ jobs:
           TF_VAR_infisical_secrets_path: ${{ vars.INFISICAL_SECRETS_PATH || '/' }}
           TF_VAR_infisical_client_id: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
           TF_VAR_infisical_client_secret: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
+          TF_VAR_enable_cert_manager_operator: ${{ inputs.enable_cert_manager || inputs.enable_rabbitmq_stack }}
+          TF_VAR_enable_rabbitmq_operator: ${{ inputs.enable_rabbitmq_stack }}
+          TF_VAR_enable_strimzi_operator: ${{ inputs.enable_strimzi }}
+          TF_VAR_enable_kyverno_operator: ${{ inputs.enable_kyverno }}
+          TF_VAR_enable_postgres: ${{ inputs.enable_postgres }}
+          TF_VAR_enable_redis: ${{ inputs.enable_redis }}
+          TF_VAR_enable_payment_service: ${{ inputs.enable_payment_service }}
+          TF_VAR_enable_order_service: ${{ inputs.enable_order_service }}
+          TF_VAR_enable_notification_service: ${{ inputs.enable_notification_service }}
         run: terraform -chdir=infra/terraform/platform destroy -auto-approve
 
       - name: Codespaces Terraform destroy

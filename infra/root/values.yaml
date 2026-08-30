@@ -24,14 +24,14 @@ operators:
     chart: external-secrets
     targetRevision: 2.8.0
   certManager:
-    enabled: true
+    enabled: false
     applicationName: resilient-orders-cert-manager
     namespace: cert-manager
     repoURL: https://charts.jetstack.io
     chart: cert-manager
     targetRevision: 1.21.1
   rabbitmq:
-    enabled: true
+    enabled: false
     applicationName: resilient-orders-rabbitmq-operator
     namespace: rabbitmq-system
     path: infra/platform-operators/rabbitmq-operator
@@ -95,7 +95,7 @@ layers:
     releaseName: resilient-orders-platform-runtime
     path: infra/platform-runtime
   services:
-    enabled: true
+    enabled: false
     wave: "0"
     applicationName: resilient-orders-services
     project: resilient-orders-services
@@ -103,3 +103,17 @@ layers:
     path: infra/services
     imageUpdater:
       enabled: false
+
+childValues:
+  platformSystem:
+    externalSecretsEnabled: true
+    kyvernoPolicyEnabled: false
+  platformRuntime:
+    postgresEnabled: true
+    redisEnabled: true
+    rabbitmqEnabled: false
+  services:
+    paymentServiceEnabled: false
+    orderServiceEnabled: false
+    notificationServiceEnabled: false
+    rabbitmqTopologyEnabled: false
