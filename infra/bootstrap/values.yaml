@@ -10,12 +10,13 @@ namespaces:
   rabbitmqOperator: rabbitmq-system
   nginxGateway: nginx-gateway
   strimzi: strimzi-system
+  certManager: cert-manager
 
 operators:
   externalSecrets:
     targetRevision: 2.8.0
-  rabbitmq:
-    targetRevision: 4.4.34
+  certManager:
+    targetRevision: 1.21.1
   gatewayApiCrds:
     targetRevision: v2.6.7
   nginxGateway:

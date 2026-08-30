@@ -70,6 +70,12 @@ variable "rabbitmq_operator_namespace" {
   default     = "rabbitmq-system"
 }
 
+variable "cert_manager_namespace" {
+  description = "Namespace where cert-manager runs. RabbitMQ Messaging Topology Operator uses it for webhook certificates."
+  type        = string
+  default     = "cert-manager"
+}
+
 variable "enable_argocd_application" {
   description = "Create the root Argo CD Application that syncs the GitOps app-of-apps chart."
   type        = bool
@@ -126,6 +132,12 @@ variable "external_secrets_chart_version" {
   default     = "2.8.0"
 }
 
+variable "cert_manager_chart_version" {
+  description = "cert-manager Helm chart version. Pin because webhook certificates are part of the operator bootstrap."
+  type        = string
+  default     = "1.21.1"
+}
+
 variable "strimzi_chart_version" {
   description = "Strimzi Kafka Operator Helm chart version."
   type        = string
@@ -142,10 +154,4 @@ variable "argocd_chart_version" {
   description = "Argo CD Helm chart version."
   type        = string
   default     = "10.1.3"
-}
-
-variable "rabbitmq_operator_chart_version" {
-  description = "Bitnami RabbitMQ Cluster Operator chart version. The chart installs both Cluster Operator and Messaging Topology Operator."
-  type        = string
-  default     = "4.4.34"
 }

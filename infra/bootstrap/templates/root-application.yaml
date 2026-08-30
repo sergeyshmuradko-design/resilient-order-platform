@@ -33,12 +33,14 @@ spec:
           value: {{ .Values.namespaces.nginxGateway | quote }}
         - name: namespaces.strimzi
           value: {{ .Values.namespaces.strimzi | quote }}
+        - name: namespaces.certManager
+          value: {{ .Values.namespaces.certManager | quote }}
         - name: containerImagePrefix
           value: {{ .Values.containerImagePrefix | quote }}
         - name: operators.externalSecrets.targetRevision
           value: {{ .Values.operators.externalSecrets.targetRevision | quote }}
-        - name: operators.rabbitmq.targetRevision
-          value: {{ .Values.operators.rabbitmq.targetRevision | quote }}
+        - name: operators.certManager.targetRevision
+          value: {{ .Values.operators.certManager.targetRevision | quote }}
         - name: operators.gatewayApiCrds.targetRevision
           value: {{ .Values.operators.gatewayApiCrds.targetRevision | quote }}
         - name: operators.nginxGateway.targetRevision

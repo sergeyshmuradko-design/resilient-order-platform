@@ -103,11 +103,11 @@ resource "helm_release" "argocd" {
   }
   set {
     name  = "controller.resources.requests.memory"
-    value = "128Mi"
+    value = "192Mi"
   }
   set {
     name  = "controller.resources.limits.memory"
-    value = "384Mi"
+    value = "768Mi"
   }
   set {
     name  = "server.resources.requests.cpu"
@@ -191,6 +191,10 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.rabbitmq_operator_namespace
   }
   set {
+    name  = "namespaces.certManager"
+    value = var.cert_manager_namespace
+  }
+  set {
     name  = "namespaces.nginxGateway"
     value = var.nginx_gateway_namespace
   }
@@ -207,8 +211,8 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.external_secrets_chart_version
   }
   set {
-    name  = "operators.rabbitmq.targetRevision"
-    value = var.rabbitmq_operator_chart_version
+    name  = "operators.certManager.targetRevision"
+    value = var.cert_manager_chart_version
   }
   set {
     name  = "operators.gatewayApiCrds.targetRevision"

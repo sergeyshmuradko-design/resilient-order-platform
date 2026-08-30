@@ -73,6 +73,65 @@ spec:
       - ApplyOutOfSyncOnly=true
 ---
 {{- end }}
+{{- if .Values.operators.certManager.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.operators.certManager.applicationName | quote }}
+  namespace: {{ .Values.namespaces.argocd | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-35"
+spec:
+  project: {{ .Values.operators.project | quote }}
+  source:
+    repoURL: {{ .Values.operators.certManager.repoURL | quote }}
+    chart: {{ .Values.operators.certManager.chart | quote }}
+    targetRevision: {{ .Values.operators.certManager.targetRevision | quote }}
+    helm:
+      releaseName: cert-manager
+      parameters:
+        - name: crds.enabled
+          value: "true"
+        - name: resources.requests.cpu
+          value: 10m
+        - name: resources.requests.memory
+          value: 64Mi
+        - name: resources.limits.cpu
+          value: 150m
+        - name: resources.limits.memory
+          value: 192Mi
+        - name: webhook.resources.requests.cpu
+          value: 10m
+        - name: webhook.resources.requests.memory
+          value: 32Mi
+        - name: webhook.resources.limits.cpu
+          value: 100m
+        - name: webhook.resources.limits.memory
+          value: 96Mi
+        - name: cainjector.resources.requests.cpu
+          value: 10m
+        - name: cainjector.resources.requests.memory
+          value: 64Mi
+        - name: cainjector.resources.limits.cpu
+          value: 150m
+        - name: cainjector.resources.limits.memory
+          value: 192Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.operators.certManager.namespace | quote }}
+  syncPolicy:
+    automated:
+      prune: {{ .Values.sync.automated.prune }}
+      selfHeal: {{ .Values.sync.automated.selfHeal }}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+---
+{{- end }}
 {{- if .Values.operators.gatewayApiCrds.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -143,6 +202,7 @@ spec:
       selfHeal: {{ .Values.sync.automated.selfHeal }}
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
 ---
@@ -160,38 +220,11 @@ metadata:
 spec:
   project: {{ .Values.operators.project | quote }}
   source:
-    repoURL: {{ .Values.operators.rabbitmq.repoURL | quote }}
-    chart: {{ .Values.operators.rabbitmq.chart | quote }}
-    targetRevision: {{ .Values.operators.rabbitmq.targetRevision | quote }}
+    repoURL: {{ .Values.repositoryUrl | quote }}
+    targetRevision: {{ .Values.targetRevision | quote }}
+    path: {{ .Values.operators.rabbitmq.path | quote }}
     helm:
       releaseName: rabbitmq-cluster-operator
-      parameters:
-        - name: clusterOperator.watchAllNamespaces
-          value: "true"
-        - name: clusterOperator.replicaCount
-          value: "1"
-        - name: clusterOperator.resources.requests.cpu
-          value: 25m
-        - name: clusterOperator.resources.requests.memory
-          value: 96Mi
-        - name: clusterOperator.resources.limits.cpu
-          value: 200m
-        - name: clusterOperator.resources.limits.memory
-          value: 256Mi
-        - name: msgTopologyOperator.enabled
-          value: "true"
-        - name: msgTopologyOperator.watchAllNamespaces
-          value: "true"
-        - name: msgTopologyOperator.replicaCount
-          value: "1"
-        - name: msgTopologyOperator.resources.requests.cpu
-          value: 25m
-        - name: msgTopologyOperator.resources.requests.memory
-          value: 96Mi
-        - name: msgTopologyOperator.resources.limits.cpu
-          value: 200m
-        - name: msgTopologyOperator.resources.limits.memory
-          value: 256Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .Values.operators.rabbitmq.namespace | quote }}
@@ -201,6 +234,7 @@ spec:
       selfHeal: {{ .Values.sync.automated.selfHeal }}
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PruneLast=true
       - ApplyOutOfSyncOnly=true
 ---
