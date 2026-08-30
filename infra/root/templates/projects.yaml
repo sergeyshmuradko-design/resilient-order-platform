@@ -9,7 +9,8 @@ spec:
   description: Admin-owned platform operators and CRDs required before runtime charts sync.
   sourceRepos:
     - {{ .Values.operators.externalSecrets.repoURL | quote }}
-    - {{ .Values.operators.rabbitmq.repoURL | quote }}
+    - {{ .Values.operators.certManager.repoURL | quote }}
+    - {{ .Values.repositoryUrl | quote }}
     - {{ .Values.operators.gatewayApiCrds.repoURL | quote }}
     - {{ .Values.operators.nginxGateway.repoURL | quote }}
     - {{ .Values.operators.strimzi.repoURL | quote }}
@@ -17,6 +18,8 @@ spec:
   destinations:
     - server: https://kubernetes.default.svc
       namespace: {{ .Values.namespaces.externalSecrets | quote }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ .Values.namespaces.certManager | quote }}
     - server: https://kubernetes.default.svc
       namespace: {{ .Values.namespaces.rabbitmqOperator | quote }}
     - server: https://kubernetes.default.svc

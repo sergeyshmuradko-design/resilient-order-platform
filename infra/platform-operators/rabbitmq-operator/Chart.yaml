@@ -1,0 +1,6 @@
+apiVersion: v2
+name: resilient-orders-rabbitmq-operator
+description: RabbitMQ Kubernetes operators packaged from official RabbitMQ release manifests.
+type: application
+version: 0.1.0
+appVersion: "2.16.1"

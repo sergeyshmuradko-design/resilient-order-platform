@@ -10,6 +10,7 @@ namespaces:
   nginxGateway: nginx-gateway
   strimzi: strimzi-system
   kyverno: kyverno-system
+  certManager: cert-manager
 
 containerImagePrefix: ghcr.io/sergeyshmuradko-design/resilient-order-platform
 
@@ -22,13 +23,18 @@ operators:
     repoURL: https://charts.external-secrets.io
     chart: external-secrets
     targetRevision: 2.8.0
+  certManager:
+    enabled: true
+    applicationName: resilient-orders-cert-manager
+    namespace: cert-manager
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: 1.21.1
   rabbitmq:
     enabled: true
     applicationName: resilient-orders-rabbitmq-operator
     namespace: rabbitmq-system
-    repoURL: https://charts.bitnami.com/bitnami
-    chart: rabbitmq-cluster-operator
-    targetRevision: 4.4.34
+    path: infra/platform-operators/rabbitmq-operator
   gatewayApiCrds:
     enabled: true
     applicationName: resilient-orders-gateway-api-crds
