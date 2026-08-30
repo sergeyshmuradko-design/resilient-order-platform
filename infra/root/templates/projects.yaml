@@ -20,6 +20,12 @@ spec:
       namespace: {{ .Values.namespaces.externalSecrets | quote }}
     - server: https://kubernetes.default.svc
       namespace: {{ .Values.namespaces.certManager | quote }}
+    # Some vendor-maintained operators, including cert-manager, create
+    # leader-election RBAC in kube-system by default. This AppProject is
+    # admin-owned, so allowing kube-system here keeps upstream chart behavior
+    # intact without granting that namespace to application teams.
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
     - server: https://kubernetes.default.svc
       namespace: {{ .Values.namespaces.rabbitmqOperator | quote }}
     - server: https://kubernetes.default.svc
