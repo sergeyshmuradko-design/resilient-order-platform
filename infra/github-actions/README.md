@@ -99,6 +99,48 @@ If the plan is acceptable, run the workflow again with:
 mode = apply
 ```
 
+The default local apply is intentionally small:
+
+```text
+enable_cert_manager = false
+enable_postgres = true
+enable_redis = true
+enable_rabbitmq_stack = false
+enable_strimzi = false
+enable_kyverno = false
+enable_payment_service = false
+enable_order_service = false
+enable_notification_service = false
+```
+
+With these defaults the workflow installs k3d, Argo CD, External Secrets
+Operator, Gateway API/NGINX Gateway, platform-system and platform-runtime. It
+does not install cert-manager, RabbitMQ operators, RabbitMQ server or service
+RabbitMQ topology. The services layer is also disabled by default so a local
+cluster bootstrap does not immediately deploy application pods.
+
+External Secrets, Gateway API/NGINX Gateway, platform-system and
+platform-runtime are intentionally not workflow switches. They are the base
+GitOps platform contract; disabling them creates combinations that do not
+represent a working cluster.
+
+Use `enable_rabbitmq_stack=true` when you want to test RabbitMQ. That single
+switch enables RabbitMQ operators, the RabbitMQ runtime cluster and the
+service-owned RabbitMQ topology. The workflow also enables cert-manager for
+that run because RabbitMQ Messaging Topology Operator uses a webhook
+certificate.
+
+Use service switches independently when you want application pods:
+
+```text
+enable_payment_service = true
+enable_order_service = true
+enable_notification_service = true
+```
+
+The services Argo CD Application is created automatically when at least one
+service switch is enabled.
+
 To return Codespaces to the pre-cluster state:
 
 ```text

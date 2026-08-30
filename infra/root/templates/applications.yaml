@@ -43,6 +43,10 @@ spec:
           value: {{ .Values.secrets.external.infisical.authSecretName | quote }}
         - name: secrets.external.infisical.authSecretNamespace
           value: {{ .Values.secrets.external.infisical.authSecretNamespace | quote }}
+        - name: secrets.external.enabled
+          value: {{ .Values.childValues.platformSystem.externalSecretsEnabled | quote }}
+        - name: policy.kyverno.enabled
+          value: {{ .Values.childValues.platformSystem.kyvernoPolicyEnabled | quote }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .Values.namespaces.platform | quote }}
@@ -77,6 +81,12 @@ spec:
       parameters:
         - name: secrets.external.storeName
           value: {{ .Values.secrets.external.storeName | quote }}
+        - name: components.postgres.enabled
+          value: {{ .Values.childValues.platformRuntime.postgresEnabled | quote }}
+        - name: components.redis.enabled
+          value: {{ .Values.childValues.platformRuntime.redisEnabled | quote }}
+        - name: components.rabbitmq.enabled
+          value: {{ .Values.childValues.platformRuntime.rabbitmqEnabled | quote }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .Values.namespaces.platform | quote }}
@@ -110,6 +120,14 @@ spec:
       parameters:
         - name: secrets.external.storeName
           value: {{ .Values.secrets.external.storeName | quote }}
+        - name: components.paymentService.enabled
+          value: {{ .Values.childValues.services.paymentServiceEnabled | quote }}
+        - name: components.orderService.enabled
+          value: {{ .Values.childValues.services.orderServiceEnabled | quote }}
+        - name: components.notificationService.enabled
+          value: {{ .Values.childValues.services.notificationServiceEnabled | quote }}
+        - name: rabbitmqTopology.enabled
+          value: {{ .Values.childValues.services.rabbitmqTopologyEnabled | quote }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .Values.namespaces.application | quote }}

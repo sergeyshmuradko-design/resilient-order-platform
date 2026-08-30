@@ -82,6 +82,60 @@ variable "enable_argocd_application" {
   default     = true
 }
 
+variable "enable_cert_manager_operator" {
+  description = "Install cert-manager through Argo CD. Keep disabled in the smallest local profile unless webhook certificates are needed."
+  type        = bool
+  default     = false
+}
+
+variable "enable_rabbitmq_operator" {
+  description = "Install RabbitMQ Cluster Operator and Messaging Topology Operator through Argo CD."
+  type        = bool
+  default     = false
+}
+
+variable "enable_strimzi_operator" {
+  description = "Install Strimzi Kafka Operator through Argo CD."
+  type        = bool
+  default     = false
+}
+
+variable "enable_kyverno_operator" {
+  description = "Install Kyverno policy engine through Argo CD."
+  type        = bool
+  default     = false
+}
+
+variable "enable_postgres" {
+  description = "Create the PostgreSQL runtime component."
+  type        = bool
+  default     = true
+}
+
+variable "enable_redis" {
+  description = "Create the Redis runtime component."
+  type        = bool
+  default     = true
+}
+
+variable "enable_payment_service" {
+  description = "Create the payment-service Deployment and route."
+  type        = bool
+  default     = false
+}
+
+variable "enable_order_service" {
+  description = "Create the order-service Deployment, route and migration job when configured."
+  type        = bool
+  default     = false
+}
+
+variable "enable_notification_service" {
+  description = "Create the notification-service Deployment, route and migration job when configured."
+  type        = bool
+  default     = false
+}
+
 variable "infisical_host_api" {
   description = "Infisical API endpoint used by External Secrets Operator."
   type        = string

@@ -211,8 +211,16 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.external_secrets_chart_version
   }
   set {
+    name  = "operators.certManager.enabled"
+    value = tostring(var.enable_cert_manager_operator)
+  }
+  set {
     name  = "operators.certManager.targetRevision"
     value = var.cert_manager_chart_version
+  }
+  set {
+    name  = "operators.rabbitmq.enabled"
+    value = tostring(var.enable_rabbitmq_operator)
   }
   set {
     name  = "operators.gatewayApiCrds.targetRevision"
@@ -223,8 +231,48 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.nginx_gateway_chart_version
   }
   set {
+    name  = "operators.strimzi.enabled"
+    value = tostring(var.enable_strimzi_operator)
+  }
+  set {
     name  = "operators.strimzi.targetRevision"
     value = var.strimzi_chart_version
+  }
+  set {
+    name  = "operators.kyverno.enabled"
+    value = tostring(var.enable_kyverno_operator)
+  }
+  set {
+    name  = "childValues.platformSystem.kyvernoPolicyEnabled"
+    value = tostring(var.enable_kyverno_operator)
+  }
+  set {
+    name  = "childValues.platformRuntime.postgresEnabled"
+    value = tostring(var.enable_postgres)
+  }
+  set {
+    name  = "childValues.platformRuntime.redisEnabled"
+    value = tostring(var.enable_redis)
+  }
+  set {
+    name  = "childValues.platformRuntime.rabbitmqEnabled"
+    value = tostring(var.enable_rabbitmq_operator)
+  }
+  set {
+    name  = "childValues.services.paymentServiceEnabled"
+    value = tostring(var.enable_payment_service)
+  }
+  set {
+    name  = "childValues.services.orderServiceEnabled"
+    value = tostring(var.enable_order_service)
+  }
+  set {
+    name  = "childValues.services.notificationServiceEnabled"
+    value = tostring(var.enable_notification_service)
+  }
+  set {
+    name  = "childValues.services.rabbitmqTopologyEnabled"
+    value = tostring(var.enable_rabbitmq_operator)
   }
   set {
     name  = "secrets.external.infisical.hostAPI"

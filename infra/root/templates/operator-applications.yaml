@@ -94,6 +94,12 @@ spec:
       parameters:
         - name: crds.enabled
           value: "true"
+        - name: replicaCount
+          value: "1"
+        - name: webhook.replicaCount
+          value: "1"
+        - name: cainjector.replicaCount
+          value: "1"
         - name: resources.requests.cpu
           value: 10m
         - name: resources.requests.memory

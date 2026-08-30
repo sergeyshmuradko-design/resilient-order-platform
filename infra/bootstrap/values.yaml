@@ -14,15 +14,38 @@ namespaces:
 
 operators:
   externalSecrets:
+    enabled: true
     targetRevision: 2.8.0
   certManager:
+    enabled: false
     targetRevision: 1.21.1
+  rabbitmq:
+    enabled: false
   gatewayApiCrds:
+    enabled: true
     targetRevision: v2.6.7
   nginxGateway:
+    enabled: true
     targetRevision: 2.6.7
   strimzi:
+    enabled: false
     targetRevision: 1.1.0
+  kyverno:
+    enabled: false
+
+childValues:
+  platformSystem:
+    externalSecretsEnabled: true
+    kyvernoPolicyEnabled: false
+  platformRuntime:
+    postgresEnabled: true
+    redisEnabled: true
+    rabbitmqEnabled: false
+  services:
+    paymentServiceEnabled: false
+    orderServiceEnabled: false
+    notificationServiceEnabled: false
+    rabbitmqTopologyEnabled: false
 
 secrets:
   external:

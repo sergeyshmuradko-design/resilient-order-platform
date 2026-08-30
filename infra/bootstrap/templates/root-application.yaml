@@ -39,14 +39,48 @@ spec:
           value: {{ .Values.containerImagePrefix | quote }}
         - name: operators.externalSecrets.targetRevision
           value: {{ .Values.operators.externalSecrets.targetRevision | quote }}
+        - name: operators.externalSecrets.enabled
+          value: {{ .Values.operators.externalSecrets.enabled | quote }}
         - name: operators.certManager.targetRevision
           value: {{ .Values.operators.certManager.targetRevision | quote }}
+        - name: operators.certManager.enabled
+          value: {{ .Values.operators.certManager.enabled | quote }}
+        - name: operators.rabbitmq.enabled
+          value: {{ .Values.operators.rabbitmq.enabled | quote }}
         - name: operators.gatewayApiCrds.targetRevision
           value: {{ .Values.operators.gatewayApiCrds.targetRevision | quote }}
+        - name: operators.gatewayApiCrds.enabled
+          value: {{ .Values.operators.gatewayApiCrds.enabled | quote }}
         - name: operators.nginxGateway.targetRevision
           value: {{ .Values.operators.nginxGateway.targetRevision | quote }}
+        - name: operators.nginxGateway.enabled
+          value: {{ .Values.operators.nginxGateway.enabled | quote }}
         - name: operators.strimzi.targetRevision
           value: {{ .Values.operators.strimzi.targetRevision | quote }}
+        - name: operators.strimzi.enabled
+          value: {{ .Values.operators.strimzi.enabled | quote }}
+        - name: operators.kyverno.enabled
+          value: {{ .Values.operators.kyverno.enabled | quote }}
+        - name: childValues.platformSystem.externalSecretsEnabled
+          value: {{ .Values.childValues.platformSystem.externalSecretsEnabled | quote }}
+        - name: childValues.platformSystem.kyvernoPolicyEnabled
+          value: {{ .Values.childValues.platformSystem.kyvernoPolicyEnabled | quote }}
+        - name: childValues.platformRuntime.postgresEnabled
+          value: {{ .Values.childValues.platformRuntime.postgresEnabled | quote }}
+        - name: childValues.platformRuntime.redisEnabled
+          value: {{ .Values.childValues.platformRuntime.redisEnabled | quote }}
+        - name: childValues.platformRuntime.rabbitmqEnabled
+          value: {{ .Values.childValues.platformRuntime.rabbitmqEnabled | quote }}
+        - name: childValues.services.paymentServiceEnabled
+          value: {{ .Values.childValues.services.paymentServiceEnabled | quote }}
+        - name: childValues.services.orderServiceEnabled
+          value: {{ .Values.childValues.services.orderServiceEnabled | quote }}
+        - name: childValues.services.notificationServiceEnabled
+          value: {{ .Values.childValues.services.notificationServiceEnabled | quote }}
+        - name: layers.services.enabled
+          value: {{ or .Values.childValues.services.paymentServiceEnabled .Values.childValues.services.orderServiceEnabled .Values.childValues.services.notificationServiceEnabled | quote }}
+        - name: childValues.services.rabbitmqTopologyEnabled
+          value: {{ .Values.childValues.services.rabbitmqTopologyEnabled | quote }}
         - name: secrets.external.storeName
           value: {{ .Values.secrets.external.storeName | quote }}
         - name: secrets.external.infisical.hostAPI
