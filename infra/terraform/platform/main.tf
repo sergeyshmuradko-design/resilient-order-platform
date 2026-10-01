@@ -172,7 +172,7 @@ resource "helm_release" "gitops_bootstrap" {
   namespace        = var.argocd_namespace
   create_namespace = true
 
-  wait    = true
+  wait = true
   # Includes asynchronous finalizers across all reverse deletion waves.
   # A timeout leaves Argo running; it is not permission to bypass finalizers.
   timeout = 1200
