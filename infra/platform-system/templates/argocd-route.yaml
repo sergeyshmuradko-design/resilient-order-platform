@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if and .Values.gateway.enabled .Values.gateway.routes.argocd.enabled }}
 # Optional local/prod-like route for the Argo CD UI.
 #
@@ -42,4 +43,5 @@ spec:
     - group: ""
       kind: Service
       name: {{ .Values.gateway.routes.argocd.backendService | quote }}
+{{- end }}
 {{- end }}

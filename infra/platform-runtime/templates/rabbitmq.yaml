@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "rabbitmq") }}
 {{- if .Values.components.rabbitmq.enabled }}
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
@@ -23,4 +24,5 @@ spec:
       # local PVC used by this project. Keep only this storage-specific override
       # and let the RabbitMQ operator derive memory settings from Pod limits.
       disk_free_limit.absolute = {{ .Values.components.rabbitmq.diskFreeLimitBytes }}
+{{- end }}
 {{- end }}

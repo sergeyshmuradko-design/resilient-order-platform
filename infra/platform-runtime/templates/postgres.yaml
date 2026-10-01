@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "postgres") }}
 {{- if .Values.components.postgres.enabled }}
 apiVersion: v1
 kind: Service
@@ -133,4 +134,5 @@ metadata:
 data:
   01-bootstrap-database.sh: |
 {{ .Files.Get "files/postgres/01-bootstrap-database.sh" | indent 4 }}
+{{- end }}
 {{- end }}

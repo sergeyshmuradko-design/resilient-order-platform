@@ -1,29 +1,32 @@
 # GitOps Bootstrap
 
-This chart is the small handoff between Terraform and Argo CD.
+Terraform installs Argo CD, then this small Helm release:
+- root AppProject;
+- root Application pointing to infra/root;
+- OCI repository configuration and Infisical Universal Auth Secret.
 
-Terraform installs Argo CD first, then installs this chart as a Helm release.
-The chart creates:
+Argo owns operator and component Applications. Deploy commits one final component
+selection; no runtime state machine or multi-commit cleanup lives in the workflow.
 
-- the `resilient-orders-root` AppProject;
-- the `resilient-orders-root` Application pointing to `infra/root`.
-
-After that, Argo CD owns the rest of the GitOps tree, including the
-third-party operators that used to be individual Terraform Helm releases:
-
-```text
-infra/root
-  -> platform operators and CRDs
-  -> infra/platform-system
-  -> infra/platform-runtime
-  -> infra/services
-```
-
-Keeping this handoff as a Helm release gives Terraform a clean destroy order:
+## Destruction boundary
 
 ```text
-destroy bootstrap release -> Argo CD prunes child apps -> destroy Argo CD
+Terraform uninstalls bootstrap
+  -> root foreground finalizer
+  -> Argo deletes child Applications in reverse waves
+  -> each child waits for its managed resources
+  -> root disappears
+Terraform uninstalls Argo CD
+Workflow destroys k3d
 ```
 
-That is why the workflow does not need a separate manual `kubectl delete
-application resilient-orders-root` step.
+The root AppProject and repository/auth Secrets use Helm's keep policy. Helm
+otherwise deletes them concurrently with root, breaking access during cleanup.
+Platform-only destroy retains these small objects; full k3d deletion removes
+them. The same release name can manage them on reinstall.
+
+No script pauses root or loops over child deletions. Finalizers are never removed
+automatically. A blocked cleanup stops before Terraform removes Argo CD.
+
+See [root ownership/order](../root/README.md) and
+[workflow test/upgrade procedure](../github-actions/WORKFLOW_EXPLAINED.md).

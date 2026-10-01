@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "kyverno") }}
 {{- if .Values.policy.kyverno.enabled }}
 # Kyverno policy guardrails.
 #
@@ -149,4 +150,5 @@ spec:
                       limits:
                         cpu: "?*"
                         memory: "?*"
+{{- end }}
 {{- end }}

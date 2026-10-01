@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if .Values.platform.config.enabled }}
 # Non-secret platform configuration. Passwords and tokens are intentionally kept
 # in platform-secrets, which can be produced by External Secrets Operator.
@@ -13,4 +14,5 @@ data:
   POSTGRES_EXPORTER_USER: {{ .Values.config.postgresExporterUser | quote }}
   RABBITMQ_HOST: {{ .Values.config.rabbitmqHost | quote }}
   RABBITMQ_PORT: {{ .Values.config.rabbitmqPort | quote }}
+{{- end }}
 {{- end }}

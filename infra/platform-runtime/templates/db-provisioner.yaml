@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "postgres") }}
 {{- if .Values.database.provisioner.enabled }}
 apiVersion: v1
 kind: ConfigMap
@@ -88,4 +89,5 @@ spec:
         - name: scripts
           configMap:
             name: db-provisioner-scripts
+{{- end }}
 {{- end }}

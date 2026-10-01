@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if .Values.serviceOwnerRbac.enabled }}
 # Optional RBAC boundary for a future real cluster with OIDC/SSO groups.
 #
@@ -56,4 +57,5 @@ roleRef:
   kind: Role
   name: service-messaging-owner
   apiGroup: rbac.authorization.k8s.io
+{{- end }}
 {{- end }}

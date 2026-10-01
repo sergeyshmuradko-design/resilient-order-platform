@@ -71,6 +71,7 @@ secrets:
   # Secrets so the long-running application containers cannot read database
   # owner credentials.
   external:
+    refreshPolicy: OnChange
     refreshInterval: 1m
     storeName: infisical-cluster-store
   runtime:
@@ -382,3 +383,6 @@ migrations:
       schema: notification_service
       ownerUserConfigKey: NOTIFICATION_SERVICE_DB_OWNER_USER
       ownerPasswordSecretKey: NOTIFICATION_SERVICE_DB_OWNER_PASSWORD
+# Root creates separate Applications from this chart. A scope has one owner;
+# "all" is only for standalone rendering, never for multiple Applications.
+renderScope: all

@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if .Values.platform.appContracts.enabled }}
 # Application-visible database contract.
 #
@@ -18,4 +19,5 @@ data:
   {{ .ownerRole.configKey }}: {{ .ownerRole.value | quote }}
   {{ .appRole.configKey }}: {{ .appRole.value | quote }}
   {{- end }}
+{{- end }}
 {{- end }}

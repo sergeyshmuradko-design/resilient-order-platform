@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "extensions") }}
 {{- if .Values.components.schemaRegistry.enabled }}
 apiVersion: v1
 kind: Service
@@ -75,4 +76,5 @@ spec:
             failureThreshold: 90
           resources:
             {{- toYaml .Values.components.schemaRegistry.resources | nindent 12 }}
+{{- end }}
 {{- end }}

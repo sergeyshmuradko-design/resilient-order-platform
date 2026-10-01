@@ -6,9 +6,10 @@ Terraform is split into three layers:
 - `platform`: Argo CD and the GitOps bootstrap Helm release;
 - `oracle`: placeholder for the future OCI VM/OKE/network layer.
 
-After Argo CD is installed, Kubernetes workloads and platform operators are
-reconciled from Git. That is the GitOps boundary: Terraform prepares the
-controller handoff, Argo CD keeps the cluster equal to repository state.
+After Argo CD is installed, Terraform creates the root Argo CD Application.
+Argo CD then owns the operator, platform-runtime and service layers from Git.
+The GitHub Actions flow is split in two so dependent runtime resources are not
+deployed until the operator layer is already Synced/Healthy.
 
 ## Local Codespaces Flow
 
@@ -45,18 +46,38 @@ The initial Argo CD handoff is a small Helm release:
 resilient-orders-bootstrap -> resilient-orders-root -> infra/root
 ```
 
-The root Application owns child Applications and keeps deployment order in one
-place:
+The first workflow bootstraps the operator layer through Argo CD:
 
 ```text
-resilient-orders-platform-system   -> infra/platform-system
-resilient-orders-platform-runtime  -> infra/platform-runtime
-resilient-orders-services          -> infra/services
+codespaces-cluster-bootstrap
+  -> k3d
+  -> Argo CD
+  -> resilient-orders-root
+  -> External Secrets Operator
+  -> Gateway API CRDs / NGINX Gateway
 ```
 
-The child Applications use Argo CD sync waves only at the layer boundary:
-platform-system, platform-runtime and service workloads. Low-level Kubernetes
-objects such as StatefulSets and Services do not carry ordering annotations.
+The second workflow deploys only after that bootstrap is ready:
+
+```text
+codespaces-platform-deploy
+  -> checks the cluster and watched Git branch
+  -> commits keep/enable/disable choices to infra/root/values.yaml
+  -> Argo CD installs selected operators first
+  -> Argo CD enables platform-system
+  -> Argo CD enables platform-runtime
+  -> Argo CD enables selected services
+```
+
+The deploy workflow intentionally does not run Terraform. Terraform stays
+responsible for the local cluster, Argo CD and the bootstrap handoff only.
+Full cleanup stays in `codespaces-cluster-bootstrap mode=destroy`. Terraform
+destroys bootstrap and waits for Argo's root finalizer, then removes Argo CD and k3d.
+Component selection persists in Git, so recreating the cluster restores it.
+
+Independently removable components have separate child Applications with waves.
+Argo prunes them in reverse order; foreground finalizers wait for their resources.
+RabbitMQ topology also uses internal waves for users/permissions/bindings.
 
 The app layer enables the first lightweight service slice, `payment-service`.
 The `payment-service` workflow publishes the service image to GHCR and updates
@@ -105,13 +126,18 @@ The order matters: remove Kubernetes/Helm resources first, then delete the k3d
 cluster. The Codespaces layer uses a `terraform_data` destroy provisioner to run:
 
 ```bash
-k3d cluster delete resilient-orders || true
+k3d cluster delete resilient-orders
 ```
 
-Terraform destroys the GitOps bootstrap Helm release before it destroys Argo CD.
+Terraform destroys the GitOps bootstrap Helm release before Argo CD.
 That release owns the `resilient-orders-root` Application with the standard Argo
 CD cascade finalizer. While Argo CD is still running, it can prune child
-Applications and workloads before Terraform removes operators and namespaces.
+Applications, workloads and operator Applications before the controller itself
+is removed.
+
+Bootstrap repository/auth Secrets and root AppProject are retained by Helm while
+the root finalizer runs. Platform-only destroy leaves them; full k3d deletion
+removes them. No automatic finalizer removal or custom child-deletion script runs.
 
 If Terraform state is unavailable, run the same fallback manually:
 

@@ -2,7 +2,7 @@
 #
 # 1. Install Argo CD as the GitOps controller.
 # 2. Install one small local Helm chart that creates the root Argo CD
-#    Application. The root Application then owns operator Applications,
+#    Application. The root Application owns operator Applications,
 #    platform-system, platform-runtime and services from Git.
 #
 # Keeping Argo CD as a separate Helm release is deliberate. During destroy,
@@ -34,8 +34,21 @@ resource "helm_release" "argocd" {
           "resource.customizations.health.argoproj.io_Application" = <<-LUA
             hs = {}
             hs.status = "Progressing"
-            hs.message = ""
-            if obj.status ~= nil then
+            hs.message = "Waiting for the child to reconcile its current source"
+            -- A previous Healthy result must not unlock the next wave after
+            -- Helm parameters changed (for example enabling a dependency).
+            local function same(a, b)
+              if type(a) ~= type(b) then return false end
+              if type(a) ~= "table" then return a == b end
+              for k, v in pairs(a) do if not same(v, b[k]) then return false end end
+              for k, _ in pairs(b) do if a[k] == nil then return false end end
+              return true
+            end
+            if obj.status ~= nil and obj.status.sync ~= nil
+              and obj.status.sync.status == "Synced"
+              and obj.status.sync.comparedTo ~= nil
+              and same(obj.spec.source, obj.status.sync.comparedTo.source)
+              and obj.operation == nil then
               if obj.status.health ~= nil then
                 hs.status = obj.status.health.status
                 if obj.status.health.message ~= nil then
@@ -160,7 +173,9 @@ resource "helm_release" "gitops_bootstrap" {
   create_namespace = true
 
   wait    = true
-  timeout = 600
+  # Includes asynchronous finalizers across all reverse deletion waves.
+  # A timeout leaves Argo running; it is not permission to bypass finalizers.
+  timeout = 1200
 
   set {
     name  = "repositoryUrl"
@@ -211,16 +226,8 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.external_secrets_chart_version
   }
   set {
-    name  = "operators.certManager.enabled"
-    value = tostring(var.enable_cert_manager_operator)
-  }
-  set {
     name  = "operators.certManager.targetRevision"
     value = var.cert_manager_chart_version
-  }
-  set {
-    name  = "operators.rabbitmq.enabled"
-    value = tostring(var.enable_rabbitmq_operator)
   }
   set {
     name  = "operators.gatewayApiCrds.targetRevision"
@@ -231,48 +238,8 @@ resource "helm_release" "gitops_bootstrap" {
     value = var.nginx_gateway_chart_version
   }
   set {
-    name  = "operators.strimzi.enabled"
-    value = tostring(var.enable_strimzi_operator)
-  }
-  set {
     name  = "operators.strimzi.targetRevision"
     value = var.strimzi_chart_version
-  }
-  set {
-    name  = "operators.kyverno.enabled"
-    value = tostring(var.enable_kyverno_operator)
-  }
-  set {
-    name  = "childValues.platformSystem.kyvernoPolicyEnabled"
-    value = tostring(var.enable_kyverno_operator)
-  }
-  set {
-    name  = "childValues.platformRuntime.postgresEnabled"
-    value = tostring(var.enable_postgres)
-  }
-  set {
-    name  = "childValues.platformRuntime.redisEnabled"
-    value = tostring(var.enable_redis)
-  }
-  set {
-    name  = "childValues.platformRuntime.rabbitmqEnabled"
-    value = tostring(var.enable_rabbitmq_operator)
-  }
-  set {
-    name  = "childValues.services.paymentServiceEnabled"
-    value = tostring(var.enable_payment_service)
-  }
-  set {
-    name  = "childValues.services.orderServiceEnabled"
-    value = tostring(var.enable_order_service)
-  }
-  set {
-    name  = "childValues.services.notificationServiceEnabled"
-    value = tostring(var.enable_notification_service)
-  }
-  set {
-    name  = "childValues.services.rabbitmqTopologyEnabled"
-    value = tostring(var.enable_rabbitmq_operator)
   }
   set {
     name  = "secrets.external.infisical.hostAPI"

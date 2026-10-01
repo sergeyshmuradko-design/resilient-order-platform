@@ -1,3 +1,4 @@
+{{- $selection := .Values.selection -}}
 {{- /*
 Admin-owned operator layer.
 
@@ -6,13 +7,18 @@ platform-system, platform-runtime and services can reconcile their custom
 resources. Root sync waves keep the order explicit:
 
 -50 AppProjects
+-35 cert-manager
 -30 operator CRDs/controllers
+-25 Gateway controller
 -20 platform-system
+-15 shared service credentials / Kyverno policies
 -10 platform-runtime
-  0 services
+ -5 RabbitMQ topology
+  0 payment-service
+ 10 dependent services
 
-During pruning Argo CD processes waves in reverse order, so service/runtime
-resources are removed before the controllers that understand their CRDs.
+Argo CD itself uses reverse waves for pruning/cascading deletion. Foreground
+finalizers keep each Application present until its resources have disappeared.
 */ -}}
 {{- if .Values.operators.externalSecrets.enabled }}
 apiVersion: argoproj.io/v1alpha1
@@ -20,6 +26,8 @@ kind: Application
 metadata:
   name: {{ .Values.operators.externalSecrets.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
@@ -73,12 +81,14 @@ spec:
       - ApplyOutOfSyncOnly=true
 ---
 {{- end }}
-{{- if .Values.operators.certManager.enabled }}
+{{- if $selection.enable_rabbitmq_stack }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .Values.operators.certManager.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
@@ -144,6 +154,8 @@ kind: Application
 metadata:
   name: {{ .Values.operators.gatewayApiCrds.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
@@ -174,6 +186,8 @@ kind: Application
 metadata:
   name: {{ .Values.operators.nginxGateway.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
@@ -213,12 +227,14 @@ spec:
       - ApplyOutOfSyncOnly=true
 ---
 {{- end }}
-{{- if .Values.operators.rabbitmq.enabled }}
+{{- if $selection.enable_rabbitmq_stack }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .Values.operators.rabbitmq.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
@@ -245,12 +261,14 @@ spec:
       - ApplyOutOfSyncOnly=true
 ---
 {{- end }}
-{{- if .Values.operators.strimzi.enabled }}
+{{- if $selection.enable_strimzi }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .Values.operators.strimzi.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
@@ -289,12 +307,14 @@ spec:
       - ApplyOutOfSyncOnly=true
 ---
 {{- end }}
-{{- if .Values.operators.kyverno.enabled }}
+{{- if $selection.enable_kyverno }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .Values.operators.kyverno.applicationName | quote }}
   namespace: {{ .Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:

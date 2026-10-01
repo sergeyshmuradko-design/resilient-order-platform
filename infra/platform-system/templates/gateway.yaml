@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if .Values.gateway.enabled }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -18,4 +19,5 @@ spec:
           selector:
             matchLabels:
               {{ .Values.namespaces.gatewayRoutesLabelKey }}: {{ .Values.namespaces.gatewayRoutesLabelValue | quote }}
+{{- end }}
 {{- end }}

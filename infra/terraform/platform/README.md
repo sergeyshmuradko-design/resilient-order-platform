@@ -9,17 +9,26 @@ It installs the GitOps bootstrap platform:
   for `infra/root`;
 - the Infisical Universal Auth settings passed into the GitOps bootstrap.
 
-External Secrets Operator, Gateway API CRDs, NGINX Gateway Fabric, RabbitMQ
-operators and optional Strimzi are now Argo CD Applications rendered from
-`infra/root`. Terraform passes shared bootstrap settings and pinned chart
-versions into the root chart, but it does not manage those operators as
-individual Terraform resources. Operator enable/disable flags live in
-`infra/root/values.yaml`.
+Terraform does not install platform operators directly. The root Argo CD
+Application owns External Secrets Operator, Gateway API/NGINX Gateway,
+cert-manager, RabbitMQ operators, Strimzi and Kyverno from Git.
 
-RabbitMQ operators are enabled by default because `infra/platform-runtime`
-declares a `RabbitmqCluster` and `infra/services` declares RabbitMQ topology
-custom resources. Strimzi remains disabled by default to keep the first
-Codespaces slice small.
+Startup ordering is handled by workflow boundaries:
+
+- `codespaces-cluster-bootstrap` creates root and waits for Git reconciliation;
+- `codespaces-platform-deploy` commits component choices to root values;
+  Argo CD installs them using dependency waves. One commit describes the final
+  selection; Argo prunes whole component Applications in reverse waves.
+- Destroy uninstalls bootstrap first and waits for the root foreground finalizer
+  before removing Argo CD. There is no custom child-deletion script.
+
+That gives a cleaner GitOps ownership model while avoiding startup races such as
+ExternalSecret or RabbitMQ topology resources being submitted before their
+operator CRDs/webhooks are ready.
+
+RabbitMQ, Strimzi and Kyverno remain disabled by default to keep the first
+Codespaces slice small. Enable them through workflow inputs when that slice is
+being tested.
 
 ## Codespaces Apply
 
@@ -33,12 +42,12 @@ terraform -chdir=infra/terraform/platform apply \
 ```
 
 External Secrets Operator reads application/runtime secrets from Infisical.
-The platform-system chart creates `infisical-universal-auth` with the Client
+The bootstrap chart creates `infisical-universal-auth` with the Client
 ID/Secret provided by GitHub Actions secrets. The actual
 PostgreSQL/RabbitMQ/Grafana/application passwords stay in Infisical.
 
-The services Application currently uses `infra/services/values.yaml`. It
-enables `payment-service`. The `payment-service` workflow publishes the image
+Per-service Applications use scopes of `infra/services/values.yaml`.
+The `payment-service` workflow publishes the image
 and commits the updated `components.paymentService.image` value to Git.
 
 ## Argo CD UI
@@ -90,5 +99,12 @@ terraform -chdir=infra/terraform/platform destroy \
 terraform -chdir=infra/terraform/codespaces destroy
 ```
 
-This removes the GitOps bootstrap release while Argo CD is still running, then
-removes Argo CD and finally the local k3d cluster.
+This removes the GitOps bootstrap release while Argo CD is still running. Argo
+CD prunes child Applications and workloads first; then Terraform removes Argo CD
+and the local k3d cluster.
+
+Root AppProject and bootstrap repository/auth Secrets are intentionally retained
+through Helm uninstall so cleanup can still use them. They remain after a
+platform-only destroy and disappear with the full k3d cluster.
+For a running old cluster, follow the [ownership migration procedure](../../root/README.md)
+before pushing this chart restructuring to its watched branch.

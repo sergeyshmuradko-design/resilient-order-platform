@@ -239,3 +239,6 @@ observability:
         limits:
           cpu: 300m
           memory: 256Mi
+# Root creates separate Applications from this chart. A scope has one owner;
+# "all" is only for standalone rendering, never for multiple Applications.
+renderScope: all

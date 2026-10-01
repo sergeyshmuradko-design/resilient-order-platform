@@ -1,5 +1,5 @@
 {{- if .Values.routes.enabled }}
-{{- if .Values.components.paymentService.enabled }}
+{{- if and .Values.components.paymentService.enabled (or (eq .Values.renderScope "all") (eq .Values.renderScope "paymentService")) }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -22,7 +22,7 @@ spec:
           port: {{ .Values.components.paymentService.port }}
 ---
 {{- end }}
-{{- if .Values.components.orderService.enabled }}
+{{- if and .Values.components.orderService.enabled (or (eq .Values.renderScope "all") (eq .Values.renderScope "orderService")) }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -45,7 +45,7 @@ spec:
           port: {{ .Values.components.orderService.port }}
 ---
 {{- end }}
-{{- if .Values.components.notificationService.enabled }}
+{{- if and .Values.components.notificationService.enabled (or (eq .Values.renderScope "all") (eq .Values.renderScope "notificationService")) }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

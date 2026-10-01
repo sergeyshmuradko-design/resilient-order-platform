@@ -128,6 +128,7 @@ terraform-validate: terraform-platform-validate
 terraform-plan: terraform-codespaces-plan
 
 # Convenience target: create local cluster first, then install platform.
+.NOTPARALLEL: terraform-apply terraform-destroy
 terraform-apply: terraform-codespaces-apply terraform-platform-apply
 
 # Convenience target: remove platform first, then delete local cluster.
@@ -140,7 +141,9 @@ terraform-destroy: terraform-platform-destroy terraform-codespaces-destroy
 # Start an ephemeral self-hosted runner inside Codespaces.
 #
 # The runner only waits for a GitHub Actions job. Terraform is executed later by
-# the workflow in .github/workflows/gitops-bootstrap-codespaces.yml.
+# one of these workflows:
+# - .github/workflows/codespaces-cluster-bootstrap.yml
+# - .github/workflows/codespaces-platform-deploy.yml
 github-runner-start:
 	bash infra/github-actions/start-codespaces-runner.sh
 

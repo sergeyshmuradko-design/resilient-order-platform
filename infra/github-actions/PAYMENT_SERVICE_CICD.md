@@ -11,7 +11,9 @@ This workflow builds, publishes and promotes only `payment-service`.
 GitHub Actions does not have Jenkins-style folders for workflows. The practical
 replacement is clear workflow naming. This project uses:
 
-- `Codespaces Cluster Setup` for Terraform/k3d/GitOps bootstrap;
+- `codespaces-cluster-bootstrap` for k3d, Argo CD and operator bootstrap;
+- `codespaces-platform-deploy` for asking Argo CD to enable runtime
+  dependencies and services;
 - `payment-service` for the service build/publish/promote flow.
 
 ## Flow
@@ -79,25 +81,32 @@ make github-runner-start
 2. Bootstrap the local cluster:
 
 ```text
-GitHub -> Actions -> Codespaces Cluster Setup -> Run workflow
+GitHub -> Actions -> codespaces-cluster-bootstrap -> Run workflow
 mode = apply
 ```
 
-3. Merge a pull request that changes `services/payment-service/**`.
+3. Enable the payment-service runtime slice:
 
-4. Check the workflow result:
+```text
+GitHub -> Actions -> codespaces-platform-deploy -> Run workflow
+enable_payment_service = true
+```
+
+4. Merge a pull request that changes `services/payment-service/**`.
+
+5. Check the workflow result:
 
 ```text
 GitHub -> Actions -> payment-service
 ```
 
-5. Check the GitOps image value:
+6. Check the GitOps image value:
 
 ```bash
 grep -n "paymentService:" -A 8 infra/services/values.yaml
 ```
 
-6. Check Kubernetes:
+7. Check Kubernetes:
 
 ```bash
 kubectl get applications -n argocd
@@ -106,7 +115,7 @@ kubectl get deploy payment-service -n resilient-orders \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ```
 
-7. Test through Gateway:
+8. Test through Gateway:
 
 ```bash
 curl -i http://payment.localhost:8080/actuator/health

@@ -1,10 +1,10 @@
-name: codespaces-cluster-setup
+name: codespaces-cluster-bootstrap
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Choose whether to plan, apply or destroy the local Codespaces cluster setup."
+        description: "Plan, apply or destroy the local Codespaces cluster bootstrap."
         required: true
         type: choice
         default: plan
@@ -12,51 +12,6 @@ on:
           - plan
           - apply
           - destroy
-      enable_cert_manager:
-        description: "Install cert-manager. RabbitMQ topology enables it automatically because its webhook needs certificates."
-        required: true
-        type: boolean
-        default: false
-      enable_postgres:
-        description: "Deploy PostgreSQL in the platform-runtime layer."
-        required: true
-        type: boolean
-        default: true
-      enable_redis:
-        description: "Deploy Redis in the platform-runtime layer."
-        required: true
-        type: boolean
-        default: true
-      enable_rabbitmq_stack:
-        description: "Install RabbitMQ operators, RabbitMQ runtime cluster and service RabbitMQ topology."
-        required: true
-        type: boolean
-        default: false
-      enable_strimzi:
-        description: "Install Strimzi Kafka Operator."
-        required: true
-        type: boolean
-        default: false
-      enable_kyverno:
-        description: "Install Kyverno policy engine."
-        required: true
-        type: boolean
-        default: false
-      enable_payment_service:
-        description: "Deploy payment-service."
-        required: true
-        type: boolean
-        default: false
-      enable_order_service:
-        description: "Deploy order-service."
-        required: true
-        type: boolean
-        default: false
-      enable_notification_service:
-        description: "Deploy notification-service."
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -76,7 +31,7 @@ jobs:
           permission="$(gh api "repos/${REPOSITORY}/collaborators/${ACTOR}/permission" --jq .permission)"
 
           if [ "$permission" != "admin" ]; then
-            echo "::error::${ACTOR} has '${permission}' permission, but this Terraform workflow requires repository admin permission."
+            echo "::error::${ACTOR} has '${permission}' permission, but cluster bootstrap requires repository admin permission."
             exit 1
           fi
 
@@ -84,25 +39,19 @@ jobs:
 
   terraform:
     needs: authorize-admin
-    # This workflow is intentionally bound to a self-hosted runner. GitHub-hosted
-    # runners cannot reach open Codespaces Docker daemon/kubeconfig.
     runs-on: [self-hosted, codespaces, k3d, resilient-orders]
+    concurrency:
+      group: codespaces-cluster
+      cancel-in-progress: false
 
     env:
       TF_IN_AUTOMATION: "true"
-      # GitHub Actions does not reliably inherit shell exports from the script
-      # that registered the self-hosted runner. Keep the marker path explicit so
-      # the runner start script can prune the same local directory after destroy.
       RUNNER_DIR: /workspaces/resilient-order-platform/.local/github-runner
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Local Codespaces uses Terraform local state in the checked-out tree.
-          # Keep untracked tfstate files between manual workflow runs so a later
-          # destroy run can see what the apply run created. A real cloud setup
-          # should replace this with a remote backend.
           clean: false
 
       - name: Setup Terraform
@@ -129,10 +78,6 @@ jobs:
         if: ${{ inputs.mode == 'plan' || inputs.mode == 'apply' }}
         run: terraform -chdir=infra/terraform/codespaces plan -out=tfplan
 
-      - name: Codespaces Terraform apply
-        if: ${{ inputs.mode == 'apply' }}
-        run: terraform -chdir=infra/terraform/codespaces apply -auto-approve tfplan
-
       - name: Check Infisical settings
         if: ${{ inputs.mode == 'apply' }}
         env:
@@ -143,6 +88,10 @@ jobs:
           test -n "$INFISICAL_PROJECT_SLUG" || { echo "::error::Set repository variable INFISICAL_PROJECT_SLUG."; exit 1; }
           test -n "$INFISICAL_UNIVERSAL_AUTH_CLIENT_ID" || { echo "::error::Set repository secret INFISICAL_UNIVERSAL_AUTH_CLIENT_ID."; exit 1; }
           test -n "$INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET" || { echo "::error::Set repository secret INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET."; exit 1; }
+
+      - name: Codespaces Terraform apply
+        if: ${{ inputs.mode == 'apply' }}
+        run: terraform -chdir=infra/terraform/codespaces apply -auto-approve tfplan
 
       - name: Platform Terraform plan
         if: ${{ inputs.mode == 'apply' }}
@@ -155,21 +104,25 @@ jobs:
           TF_VAR_infisical_secrets_path: ${{ vars.INFISICAL_SECRETS_PATH || '/' }}
           TF_VAR_infisical_client_id: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
           TF_VAR_infisical_client_secret: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
-          TF_VAR_enable_cert_manager_operator: ${{ inputs.enable_cert_manager || inputs.enable_rabbitmq_stack }}
-          TF_VAR_enable_rabbitmq_operator: ${{ inputs.enable_rabbitmq_stack }}
-          TF_VAR_enable_strimzi_operator: ${{ inputs.enable_strimzi }}
-          TF_VAR_enable_kyverno_operator: ${{ inputs.enable_kyverno }}
-          TF_VAR_enable_postgres: ${{ inputs.enable_postgres }}
-          TF_VAR_enable_redis: ${{ inputs.enable_redis }}
-          TF_VAR_enable_payment_service: ${{ inputs.enable_payment_service }}
-          TF_VAR_enable_order_service: ${{ inputs.enable_order_service }}
-          TF_VAR_enable_notification_service: ${{ inputs.enable_notification_service }}
         run: terraform -chdir=infra/terraform/platform plan -out=tfplan
 
       - name: Platform Terraform apply
         if: ${{ inputs.mode == 'apply' }}
         run: terraform -chdir=infra/terraform/platform apply -auto-approve tfplan
 
+      # Wait for the fixed baseline only; optional operators belong to deploy.
+      - name: Wait for baseline bootstrap
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          kubectl config use-context k3d-resilient-orders
+          # Argo CD may also restore the Git-selected stack on a recreated cluster.
+          kubectl -n argocd wait application/resilient-orders-root \
+            --for=jsonpath='{.status.sync.status}'=Synced --timeout=600s
+          kubectl -n argocd wait application/resilient-orders-root \
+            --for=jsonpath='{.status.health.status}'=Healthy --timeout=600s
+
+      # Terraform removes bootstrap first. Argo's root finalizer cascades through
+      # child Applications in reverse waves while the Argo controller is alive.
       - name: Platform Terraform destroy
         if: ${{ inputs.mode == 'destroy' }}
         env:
@@ -181,15 +134,6 @@ jobs:
           TF_VAR_infisical_secrets_path: ${{ vars.INFISICAL_SECRETS_PATH || '/' }}
           TF_VAR_infisical_client_id: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID }}
           TF_VAR_infisical_client_secret: ${{ secrets.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET }}
-          TF_VAR_enable_cert_manager_operator: ${{ inputs.enable_cert_manager || inputs.enable_rabbitmq_stack }}
-          TF_VAR_enable_rabbitmq_operator: ${{ inputs.enable_rabbitmq_stack }}
-          TF_VAR_enable_strimzi_operator: ${{ inputs.enable_strimzi }}
-          TF_VAR_enable_kyverno_operator: ${{ inputs.enable_kyverno }}
-          TF_VAR_enable_postgres: ${{ inputs.enable_postgres }}
-          TF_VAR_enable_redis: ${{ inputs.enable_redis }}
-          TF_VAR_enable_payment_service: ${{ inputs.enable_payment_service }}
-          TF_VAR_enable_order_service: ${{ inputs.enable_order_service }}
-          TF_VAR_enable_notification_service: ${{ inputs.enable_notification_service }}
         run: terraform -chdir=infra/terraform/platform destroy -auto-approve
 
       - name: Codespaces Terraform destroy
