@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "extensions") }}
 {{- if .Values.observability.monitoring.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -333,4 +334,5 @@ spec:
     - name: http
       port: {{ .Values.exposure.grafana.port }}
       targetPort: http
+{{- end }}
 {{- end }}

@@ -81,13 +81,19 @@ The first GitOps slice is deliberately small:
 
 - Argo CD
 - External Secrets Operator
-- Strimzi Kafka Operator
 - Gateway API CRDs and NGINX Gateway Fabric
-- PostgreSQL
 
-PostgreSQL is reconciled as the first platform workload. Secrets are read from
-Infisical through External Secrets Operator. RabbitMQ, Kafka, Schema Registry,
-services and observability stay in Helm values for later stages.
+Optional operators and runtime workloads are selected in `codespaces-platform-deploy`.
+Deploy commits selected components to `infra/root/values.yaml`; Argo CD updates
+the existing stack. Each component offers `keep / enable / disable`: unchanged
+choices create no commit. Changes create one commit; Argo CD orders removal
+through separate component Applications, reverse waves and foreground finalizers.
+System/runtime Applications and namespaces remain when all components are disabled.
+Full cluster removal belongs to bootstrap `mode=destroy`.
+Before upgrading a running cluster from grouped Applications, read the
+[ownership migration procedure](infra/root/README.md#upgrade-from-the-previous-grouped-applications).
+Secrets are read from Infisical through External Secrets Operator. Strimzi's
+switch installs the operator only; Kafka brokers and observability remain future stages.
 
 ### Start from GitHub Actions
 
@@ -104,11 +110,20 @@ make github-runner-start
 Then run the manual workflow in GitHub:
 
 ```text
-Actions -> Codespaces Cluster Setup -> Run workflow
+Actions -> codespaces-cluster-bootstrap -> Run workflow
 ```
 
 Use `mode=plan` for a plan, `mode=apply` to create/update, and `mode=destroy`
 to remove platform resources and delete the local k3d cluster.
+
+After bootstrap succeeds, deploy runtime/services from the second workflow:
+
+```text
+Actions -> codespaces-platform-deploy -> Run workflow
+```
+
+This workflow does not run Terraform; it patches the root Argo CD Application
+and lets Argo CD reconcile the selected runtime/service layer.
 
 The runner waits for the workflow job. Terraform does not start automatically
 when the runner starts.

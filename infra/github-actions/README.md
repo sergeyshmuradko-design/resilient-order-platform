@@ -84,7 +84,7 @@ Infisical connection settings from GitHub Actions secrets and variables.
 7. In GitHub, open:
 
 ```text
-Repository -> Actions -> Codespaces Cluster Setup -> Run workflow
+Repository -> Actions -> codespaces-cluster-bootstrap -> Run workflow
 ```
 
 For the first run choose:
@@ -99,51 +99,56 @@ If the plan is acceptable, run the workflow again with:
 mode = apply
 ```
 
-The default local apply is intentionally small:
+Bootstrap has only the `mode` input. All optional component switches belong to
+`codespaces-platform-deploy`.
+
+With the initial Git selection the workflow installs k3d, Argo CD, External
+Secrets and Gateway API/NGINX Gateway. On later cluster recreations Argo CD also
+restores the selection already committed to `infra/root/values.yaml`.
+
+After bootstrap succeeds, open the second workflow:
 
 ```text
-enable_cert_manager = false
-enable_postgres = true
-enable_redis = true
-enable_rabbitmq_stack = false
-enable_strimzi = false
-enable_kyverno = false
-enable_payment_service = false
-enable_order_service = false
-enable_notification_service = false
+Repository -> Actions -> codespaces-platform-deploy -> Run workflow
 ```
 
-With these defaults the workflow installs k3d, Argo CD, External Secrets
-Operator, Gateway API/NGINX Gateway, platform-system and platform-runtime. It
-does not install cert-manager, RabbitMQ operators, RabbitMQ server or service
-RabbitMQ topology. The services layer is also disabled by default so a local
-cluster bootstrap does not immediately deploy application pods.
+For runtime/service deployment choose:
 
-External Secrets, Gateway API/NGINX Gateway, platform-system and
-platform-runtime are intentionally not workflow switches. They are the base
-GitOps platform contract; disabling them creates combinations that do not
-represent a working cluster.
+```text
+enable_postgres = enable
+enable_redis = enable
+enable_payment_service = enable
+```
 
-Use `enable_rabbitmq_stack=true` when you want to test RabbitMQ. That single
-switch enables RabbitMQ operators, the RabbitMQ runtime cluster and the
-service-owned RabbitMQ topology. The workflow also enables cert-manager for
-that run because RabbitMQ Messaging Topology Operator uses a webhook
-certificate.
+This second workflow does not run Terraform or reset resources. It commits
+the requested selection to `infra/root/values.yaml` using the GitOps GitHub App,
+then waits for Argo CD. Each choice is `keep`, `enable` or `disable`. Matching
+choices create no commit. Changes use one commit; Argo orders cascading removal.
+Use `GITOPS_APP_CLIENT_ID` (repository variable) and `GITOPS_APP_PRIVATE_KEY`
+(repository secret), as in payment-service CI. The App needs Contents: write
+and an appropriate branch-rules bypass to push this commit.
+See [the detailed walkthrough](WORKFLOW_EXPLAINED.md).
+
+Use `enable_rabbitmq_stack=enable` when you want to test RabbitMQ. That single
+switch in `codespaces-platform-deploy` enables cert-manager, RabbitMQ operators,
+the RabbitMQ runtime cluster and service-owned RabbitMQ topology.
 
 Use service switches independently when you want application pods:
 
 ```text
-enable_payment_service = true
-enable_order_service = true
-enable_notification_service = true
+enable_payment_service = enable
+enable_order_service = enable
+enable_notification_service = enable
 ```
 
-The services Argo CD Application is created automatically when at least one
-service switch is enabled.
+Each enabled service gets its own Application; shared secrets/RBAC stay in the
+base services Application. See the migration warning in [root README](../root/README.md)
+before pushing these ownership changes to a branch watched by an old cluster.
 
 To return Codespaces to the pre-cluster state:
 
 ```text
+Repository -> Actions -> codespaces-cluster-bootstrap -> Run workflow
 mode = destroy
 ```
 
@@ -227,15 +232,17 @@ Starting the runner does not start Terraform. The sequence is:
 7. The `actions/checkout` step checks out the repository into the runner work
    directory.
 8. The `hashicorp/setup-terraform` step downloads Terraform for that job.
-9. Terraform runs from `infra/terraform`.
+9. In `codespaces-cluster-bootstrap`, Terraform runs from `infra/terraform`.
 10. With `mode=plan`, the workflow plans `infra/terraform/codespaces`.
 11. With `mode=apply`, the workflow applies `codespaces`, then plans and
     applies `platform`.
-12. With `mode=destroy`, Terraform destroys `platform` first. The platform
+12. In `codespaces-platform-deploy`, the workflow commits additional components
+    to root values; Argo CD deploys them without Terraform or a resource reset.
+13. With `mode=destroy`, Terraform destroys `platform`. The platform
     layer removes the GitOps bootstrap Helm release before Argo CD, so Argo CD
     can prune child Applications while its controller is still running. Then the
     workflow destroys `codespaces`, which deletes the k3d cluster.
-13. After a successful destroy, the runner start script prunes local runner
+14. After a successful destroy, the runner start script prunes local runner
     working data so `.local/github-runner` does not keep growing.
 
 ## Script Explanation
@@ -244,7 +251,7 @@ Detailed line-by-line notes:
 
 - [start-codespaces-runner.sh](RUNNER_SCRIPT_EXPLAINED.md#start-codespaces-runnersh)
 - [cleanup-codespaces-runner.sh](RUNNER_SCRIPT_EXPLAINED.md#cleanup-codespaces-runnersh)
-- [codespaces-cluster-setup.yml](WORKFLOW_EXPLAINED.md)
+- [cluster/deploy workflows](WORKFLOW_EXPLAINED.md)
 
 Terraform bootstrap explanation:
 

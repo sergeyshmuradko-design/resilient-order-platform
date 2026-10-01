@@ -124,6 +124,7 @@ secrets:
   targetName: platform-secrets
   external:
     enabled: true
+    refreshPolicy: OnChange
     refreshInterval: 1m
     storeName: infisical-cluster-store
     operatorServiceAccount: external-secrets
@@ -272,3 +273,6 @@ observability:
         limits:
           cpu: 300m
           memory: 256Mi
+# Root creates separate Applications from this chart. A scope has one owner;
+# "all" is only for standalone rendering, never for multiple Applications.
+renderScope: all

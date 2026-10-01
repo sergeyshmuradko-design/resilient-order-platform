@@ -9,9 +9,10 @@ This group is for shared runtime infrastructure consumed by services:
 - later Kafka, Schema Registry, tracing and monitoring slices.
 
 RabbitMQ is deployed as a `RabbitmqCluster` custom resource. The RabbitMQ
-Cluster Operator is installed by the Terraform platform layer, while this chart
+Cluster Operator is installed by an Argo CD operator Application, while this chart
 owns only the desired broker instance and its local resource limits.
 
-`infra/root` creates the platform-runtime child Application and points it at
-this chart directly. Disabled future components keep their resource limits in
+`infra/root` creates separate PostgreSQL, Redis and RabbitMQ Applications from
+this chart using `renderScope`. A retained extensions Application owns the future
+Kafka/tracing/monitoring templates. Disabled future components keep their limits in
 `values.yaml` so they can be enabled later without redesigning the profile.

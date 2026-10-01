@@ -1,4 +1,4 @@
-{{- if .Values.components.orderService.enabled }}
+{{- if and .Values.components.orderService.enabled (or (eq .Values.renderScope "all") (eq .Values.renderScope "orderService")) }}
 apiVersion: v1
 kind: Service
 metadata:

@@ -1,6 +1,6 @@
 {{- if .Values.migrations.enabled }}
 {{- range .Values.migrations.services }}
-{{- if .enabled }}
+{{- if and .enabled (or (eq $.Values.renderScope "all") (eq $.Values.renderScope .imageKey)) }}
 {{- $image := "" }}
 {{- if eq .imageKey "orderService" }}
 {{- $image = $.Values.components.orderService.migrationImage }}

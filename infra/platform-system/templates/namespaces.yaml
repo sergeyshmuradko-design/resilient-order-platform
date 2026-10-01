@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if .Values.namespaces.manage }}
 # Platform-owned namespaces.
 #
@@ -23,4 +24,5 @@ metadata:
   labels:
     {{ .Values.namespaces.gatewayRoutesLabelKey }}: {{ .Values.namespaces.gatewayRoutesLabelValue | quote }}
     {{- include "resilient-orders.labels" . | nindent 4 }}
+{{- end }}
 {{- end }}

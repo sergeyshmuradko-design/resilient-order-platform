@@ -1,141 +1,86 @@
 {{- /*
-The root Application renders the three GitOps ownership groups.
-
-Sync waves are intentionally kept only at this boundary:
-- platform-system: shared config, Gateway and ExternalSecret plumbing;
-- platform-runtime: PostgreSQL, Redis, RabbitMQ and future shared runtime tools;
-- services: application workloads.
-
-Each child chart has exactly one values.yaml. Image promotion should open a pull
-request that updates that Git-owned values file instead of mutating the live
-Argo CD Application.
+One Application per independently removable component. The parent prunes whole
+Applications in reverse wave order; their foreground finalizers wait for the
+actual resources. Chart scopes prevent multiple Applications owning one object.
+Namespaces/credentials are a permanent base, not part of optional components.
 */ -}}
-{{- if .Values.layers.platformSystem.enabled }}
+{{- $s := .Values.selection -}}
+{{- $system := .Values.layers.platformSystem -}}
+{{- $runtime := .Values.layers.platformRuntime -}}
+{{- $services := .Values.layers.services -}}
+{{- $apps := list
+  (dict "name" $system.applicationName "layer" $system "namespace" .Values.namespaces.platform "scope" "base" "wave" -20 "enabled" true)
+  (dict "name" $services.applicationName "layer" $services "namespace" .Values.namespaces.application "scope" "base" "wave" -15 "enabled" true)
+  (dict "name" $runtime.applicationName "layer" $runtime "namespace" .Values.namespaces.platform "scope" "extensions" "wave" -10 "enabled" true)
+  (dict "name" "resilient-orders-postgres" "layer" $runtime "namespace" .Values.namespaces.platform "scope" "postgres" "wave" -10 "enabled" $s.enable_postgres)
+  (dict "name" "resilient-orders-redis" "layer" $runtime "namespace" .Values.namespaces.platform "scope" "redis" "wave" -10 "enabled" $s.enable_redis)
+  (dict "name" "resilient-orders-rabbitmq-broker" "layer" $runtime "namespace" .Values.namespaces.platform "scope" "rabbitmq" "wave" -10 "enabled" $s.enable_rabbitmq_stack)
+  (dict "name" "resilient-orders-rabbitmq-topology" "layer" $services "namespace" .Values.namespaces.application "scope" "rabbitmq" "wave" -5 "enabled" $s.enable_rabbitmq_stack)
+  (dict "name" "resilient-orders-kyverno-policies" "layer" $system "namespace" .Values.namespaces.platform "scope" "kyverno" "wave" -15 "enabled" $s.enable_kyverno)
+  (dict "name" "resilient-orders-payment-service" "layer" $services "namespace" .Values.namespaces.application "scope" "paymentService" "wave" 0 "enabled" $s.enable_payment_service)
+  (dict "name" "resilient-orders-order-service" "layer" $services "namespace" .Values.namespaces.application "scope" "orderService" "wave" 10 "enabled" $s.enable_order_service)
+  (dict "name" "resilient-orders-notification-service" "layer" $services "namespace" .Values.namespaces.application "scope" "notificationService" "wave" 10 "enabled" $s.enable_notification_service)
+-}}
+{{- range $app := $apps }}
+{{- if $app.enabled }}
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.layers.platformSystem.applicationName | quote }}
-  namespace: {{ .Values.namespaces.argocd | quote }}
+  name: {{ $app.name | quote }}
+  namespace: {{ $.Values.namespaces.argocd | quote }}
+  labels:
+    resilient-orders.io/root: resilient-orders-root
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    argocd.argoproj.io/sync-wave: {{ .Values.layers.platformSystem.wave | quote }}
+    argocd.argoproj.io/sync-wave: {{ $app.wave | quote }}
 spec:
-  project: {{ .Values.layers.platformSystem.project | quote }}
+  project: {{ $app.layer.project | quote }}
   source:
-    repoURL: {{ .Values.repositoryUrl | quote }}
-    targetRevision: {{ .Values.targetRevision | quote }}
-    path: {{ .Values.layers.platformSystem.path | quote }}
+    repoURL: {{ $.Values.repositoryUrl | quote }}
+    targetRevision: {{ $.Values.targetRevision | quote }}
+    path: {{ $app.layer.path | quote }}
     helm:
-      releaseName: {{ .Values.layers.platformSystem.releaseName | quote }}
+      releaseName: {{ $app.name | quote }}
       parameters:
+        - name: renderScope
+          value: {{ $app.scope | quote }}
         - name: secrets.external.storeName
-          value: {{ .Values.secrets.external.storeName | quote }}
-        - name: secrets.external.infisical.hostAPI
-          value: {{ .Values.secrets.external.infisical.hostAPI | quote }}
-        - name: secrets.external.infisical.projectSlug
-          value: {{ .Values.secrets.external.infisical.projectSlug | quote }}
-        - name: secrets.external.infisical.environmentSlug
-          value: {{ .Values.secrets.external.infisical.environmentSlug | quote }}
-        - name: secrets.external.infisical.secretsPath
-          value: {{ .Values.secrets.external.infisical.secretsPath | quote }}
-        - name: secrets.external.infisical.authSecretName
-          value: {{ .Values.secrets.external.infisical.authSecretName | quote }}
-        - name: secrets.external.infisical.authSecretNamespace
-          value: {{ .Values.secrets.external.infisical.authSecretNamespace | quote }}
-        - name: secrets.external.enabled
-          value: {{ .Values.childValues.platformSystem.externalSecretsEnabled | quote }}
+          value: {{ $.Values.secrets.external.storeName | quote }}
+        {{- if eq $app.layer.path $system.path }}
         - name: policy.kyverno.enabled
-          value: {{ .Values.childValues.platformSystem.kyvernoPolicyEnabled | quote }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: {{ .Values.namespaces.platform | quote }}
-  syncPolicy:
-    automated:
-      prune: {{ .Values.sync.automated.prune }}
-      selfHeal: {{ .Values.sync.automated.selfHeal }}
-    syncOptions:
-      - CreateNamespace=true
-      - PruneLast=true
-      - ApplyOutOfSyncOnly=true
----
-{{- end }}
-{{- if .Values.layers.platformRuntime.enabled }}
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: {{ .Values.layers.platformRuntime.applicationName | quote }}
-  namespace: {{ .Values.namespaces.argocd | quote }}
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-  annotations:
-    argocd.argoproj.io/sync-wave: {{ .Values.layers.platformRuntime.wave | quote }}
-spec:
-  project: {{ .Values.layers.platformRuntime.project | quote }}
-  source:
-    repoURL: {{ .Values.repositoryUrl | quote }}
-    targetRevision: {{ .Values.targetRevision | quote }}
-    path: {{ .Values.layers.platformRuntime.path | quote }}
-    helm:
-      releaseName: {{ .Values.layers.platformRuntime.releaseName | quote }}
-      parameters:
-        - name: secrets.external.storeName
-          value: {{ .Values.secrets.external.storeName | quote }}
-        - name: components.postgres.enabled
-          value: {{ .Values.childValues.platformRuntime.postgresEnabled | quote }}
-        - name: components.redis.enabled
-          value: {{ .Values.childValues.platformRuntime.redisEnabled | quote }}
-        - name: components.rabbitmq.enabled
-          value: {{ .Values.childValues.platformRuntime.rabbitmqEnabled | quote }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: {{ .Values.namespaces.platform | quote }}
-  syncPolicy:
-    automated:
-      prune: {{ .Values.sync.automated.prune }}
-      selfHeal: {{ .Values.sync.automated.selfHeal }}
-    syncOptions:
-      - PruneLast=true
-      - ApplyOutOfSyncOnly=true
----
-{{- end }}
-{{- if .Values.layers.services.enabled }}
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: {{ .Values.layers.services.applicationName | quote }}
-  namespace: {{ .Values.namespaces.argocd | quote }}
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-  annotations:
-    argocd.argoproj.io/sync-wave: {{ .Values.layers.services.wave | quote }}
-spec:
-  project: {{ .Values.layers.services.project | quote }}
-  source:
-    repoURL: {{ .Values.repositoryUrl | quote }}
-    targetRevision: {{ .Values.targetRevision | quote }}
-    path: {{ .Values.layers.services.path | quote }}
-    helm:
-      releaseName: {{ .Values.layers.services.releaseName | quote }}
-      parameters:
-        - name: secrets.external.storeName
-          value: {{ .Values.secrets.external.storeName | quote }}
-        - name: components.paymentService.enabled
-          value: {{ .Values.childValues.services.paymentServiceEnabled | quote }}
-        - name: components.orderService.enabled
-          value: {{ .Values.childValues.services.orderServiceEnabled | quote }}
-        - name: components.notificationService.enabled
-          value: {{ .Values.childValues.services.notificationServiceEnabled | quote }}
+          value: {{ eq $app.scope "kyverno" | quote }}
+        {{- range $key := list "hostAPI" "projectSlug" "environmentSlug" "secretsPath" "authSecretName" "authSecretNamespace" }}
+        - name: {{ printf "secrets.external.infisical.%s" $key }}
+          value: {{ index $.Values.secrets.external.infisical $key | quote }}
+        {{- end }}
+        {{- else if eq $app.layer.path $runtime.path }}
+        {{- range $name := list "postgres" "redis" "rabbitmq" }}
+        - name: {{ printf "components.%s.enabled" $name }}
+          value: {{ eq $app.scope $name | quote }}
+        {{- end }}
+        {{- else if eq $app.layer.path $services.path }}
+        {{- range $name := list "paymentService" "orderService" "notificationService" }}
+        - name: {{ printf "components.%s.enabled" $name }}
+          value: {{ eq $app.scope $name | quote }}
+        {{- end }}
         - name: rabbitmqTopology.enabled
-          value: {{ .Values.childValues.services.rabbitmqTopologyEnabled | quote }}
+          value: {{ eq $app.scope "rabbitmq" | quote }}
+        {{- end }}
   destination:
     server: https://kubernetes.default.svc
-    namespace: {{ .Values.namespaces.application | quote }}
+    namespace: {{ $app.namespace | quote }}
   syncPolicy:
     automated:
-      prune: {{ .Values.sync.automated.prune }}
-      selfHeal: {{ .Values.sync.automated.selfHeal }}
+      prune: {{ $.Values.sync.automated.prune }}
+      selfHeal: {{ $.Values.sync.automated.selfHeal }}
+      {{- if eq $app.scope "extensions" }}
+      # Future Kafka/tracing/monitoring remain disabled by default.
+      allowEmpty: true
+      {{- end }}
     syncOptions:
-      - PruneLast=true
-      - ApplyOutOfSyncOnly=true
+      - PrunePropagationPolicy=foreground
+      - FailOnSharedResource=true
+{{- end }}
 {{- end }}

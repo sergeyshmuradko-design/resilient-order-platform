@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "rabbitmq") }}
 {{- if .Values.rabbitmqTopology.enabled }}
 {{- $root := . -}}
 {{- range .Values.rabbitmqTopology.users }}
@@ -15,6 +16,7 @@ metadata:
   labels:
     {{- include "resilient-orders.componentLabels" (dict "root" $root "name" .name "component" "messaging") | nindent 4 }}
 spec:
+  refreshPolicy: {{ $root.Values.secrets.external.refreshPolicy | quote }}
   refreshInterval: {{ $root.Values.secrets.external.refreshInterval }}
   secretStoreRef:
     kind: ClusterSecretStore
@@ -164,5 +166,6 @@ spec:
   rabbitmqClusterReference:
     name: {{ $root.Values.rabbitmqTopology.clusterName | quote }}
     namespace: {{ $root.Values.rabbitmqTopology.clusterNamespace | quote }}
+{{- end }}
 {{- end }}
 {{- end }}

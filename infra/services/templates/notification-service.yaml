@@ -1,4 +1,4 @@
-{{- if .Values.components.notificationService.enabled }}
+{{- if and .Values.components.notificationService.enabled (or (eq .Values.renderScope "all") (eq .Values.renderScope "notificationService")) }}
 apiVersion: v1
 kind: Service
 metadata:

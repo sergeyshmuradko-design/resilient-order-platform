@@ -8,6 +8,9 @@ kind: Secret
 metadata:
   name: nginx-gateway-fabric-oci-repository
   namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    # Retain repository access while the root finalizer deletes child apps.
+    helm.sh/resource-policy: keep
   labels:
     argocd.argoproj.io/secret-type: repository
 type: Opaque
@@ -22,6 +25,8 @@ kind: Secret
 metadata:
   name: strimzi-oci-repository
   namespace: {{ .Values.namespaces.argocd | quote }}
+  annotations:
+    helm.sh/resource-policy: keep
   labels:
     argocd.argoproj.io/secret-type: repository
 type: Opaque

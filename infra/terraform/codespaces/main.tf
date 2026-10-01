@@ -33,6 +33,7 @@ resource "terraform_data" "k3d_cluster" {
   provisioner "local-exec" {
     when        = destroy
     interpreter = ["bash", "-ec"]
-    command     = "k3d cluster delete ${self.input.cluster_name} || true"
+    # Do not mark Terraform destroy successful when Docker/k3d deletion failed.
+    command     = "k3d cluster delete ${self.input.cluster_name}"
   }
 }

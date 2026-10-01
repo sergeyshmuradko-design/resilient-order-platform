@@ -1,3 +1,4 @@
+{{- if or (eq .Values.renderScope "all") (eq .Values.renderScope "base") }}
 {{- if .Values.guardrails.enabled }}
 # Namespace-level safety rails for constrained local/k3s/k3d/Oracle VM runs.
 apiVersion: v1
@@ -35,4 +36,4 @@ spec:
         cpu: {{ .Values.guardrails.limitRange.maxCpu | quote }}
         memory: {{ .Values.guardrails.limitRange.maxMemory | quote }}
 {{- end }}
-
+{{- end }}

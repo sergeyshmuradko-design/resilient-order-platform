@@ -1,0 +1,157 @@
+name: codespaces-platform-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      enable_postgres:
+        description: "PostgreSQL in the platform-runtime layer. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_redis:
+        description: "Redis in the platform-runtime layer. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_rabbitmq_stack:
+        description: "RabbitMQ runtime cluster and service RabbitMQ topology. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_strimzi:
+        description: "Strimzi Operator (does not enable Kafka brokers). keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_kyverno:
+        description: "Kyverno and enable project policies. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_payment_service:
+        description: "payment-service. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_order_service:
+        description: "order-service. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+      enable_notification_service:
+        description: "notification-service. keep preserves Git state; disable removes the component."
+        required: true
+        type: choice
+        default: keep
+        options: [keep, enable, disable]
+
+permissions:
+  contents: read
+
+jobs:
+  authorize-admin:
+    name: Authorize repository admin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check actor repository permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          permission="$(gh api "repos/${REPOSITORY}/collaborators/${ACTOR}/permission" --jq .permission)"
+
+          if [ "$permission" != "admin" ]; then
+            echo "::error::${ACTOR} has '${permission}' permission, but platform deploy requires repository admin permission."
+            exit 1
+          fi
+
+          echo "${ACTOR} is authorized with repository admin permission."
+
+  deploy:
+    name: Commit desired components and wait for Argo CD
+    needs: authorize-admin
+    runs-on: [self-hosted, codespaces, k3d, resilient-orders]
+    concurrency:
+      group: codespaces-cluster
+      cancel-in-progress: false
+
+    env:
+      TARGET_BRANCH: ${{ github.ref_name }}
+      COMPONENT_INPUTS: ${{ toJSON(inputs) }}
+
+    steps:
+      - name: Create GitOps GitHub App token
+        id: gitops-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.GITOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          # Terraform state currently lives in this runner checkout.
+          clean: false
+          token: ${{ steps.gitops-token.outputs.token }}
+
+      - name: Check cluster and watched branch
+        run: |
+          set -euo pipefail
+          kubectl config use-context k3d-resilient-orders
+          watched="$(kubectl -n argocd get application resilient-orders-root -o jsonpath='{.spec.source.targetRevision}')"
+          test "$watched" = "$TARGET_BRANCH" || {
+            echo "::error::Argo CD watches $watched. Run this workflow from that branch."
+            exit 1
+          }
+          # Reject the old bootstrap before writing a commit it cannot correctly consume.
+          kubectl -n argocd get application resilient-orders-root -o json | jq -e '
+            [.spec.source.helm.parameters[]?.name |
+              select(startswith("childValues.") or startswith("layers.") or
+                (startswith("operators.") and endswith(".enabled")))] | length == 0' >/dev/null || {
+            echo "::error::Run bootstrap apply with the new chart before deploying."
+            exit 1
+          }
+
+      - name: Install pinned yq
+        env:
+          YQ_VERSION: v4.45.1
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64) arch=amd64 ;;
+            aarch64) arch=arm64 ;;
+            *) echo "::error::Unsupported runner architecture"; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/gitops-tools"
+          curl --fail --location --retry 3 \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${arch}" \
+            -o "$RUNNER_TEMP/gitops-tools/yq"
+          chmod +x "$RUNNER_TEMP/gitops-tools/yq"
+          echo "$RUNNER_TEMP/gitops-tools" >> "$GITHUB_PATH"
+
+      - name: Configure GitOps author
+        env:
+          GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          APP_SLUG: ${{ steps.gitops-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          app_user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${app_user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+      - name: Reconcile requested component choices through Git
+        run: bash infra/github-actions/apply-selection.sh

@@ -1,3 +1,14 @@
+# Desired component state. Workflow choices keep/enable/disable update these booleans.
+selection:
+  enable_postgres: false
+  enable_redis: false
+  enable_rabbitmq_stack: false
+  enable_strimzi: false
+  enable_kyverno: false
+  enable_payment_service: false
+  enable_order_service: false
+  enable_notification_service: false
+
 repositoryUrl: ""
 targetRevision: main
 
@@ -24,14 +35,12 @@ operators:
     chart: external-secrets
     targetRevision: 2.8.0
   certManager:
-    enabled: false
     applicationName: resilient-orders-cert-manager
     namespace: cert-manager
     repoURL: https://charts.jetstack.io
     chart: cert-manager
     targetRevision: 1.21.1
   rabbitmq:
-    enabled: false
     applicationName: resilient-orders-rabbitmq-operator
     namespace: rabbitmq-system
     path: infra/platform-operators/rabbitmq-operator
@@ -49,14 +58,12 @@ operators:
     chart: nginx-gateway-fabric
     targetRevision: 2.6.7
   strimzi:
-    enabled: false
     applicationName: resilient-orders-strimzi
     namespace: strimzi-system
     repoURL: quay.io/strimzi-helm
     chart: strimzi-kafka-operator
     targetRevision: 1.1.0
   kyverno:
-    enabled: false
     applicationName: resilient-orders-kyverno
     namespace: kyverno-system
     repoURL: https://kyverno.github.io/kyverno
@@ -81,39 +88,14 @@ sync:
 
 layers:
   platformSystem:
-    enabled: true
-    wave: "-20"
     applicationName: resilient-orders-platform-system
     project: resilient-orders-platform-system
-    releaseName: resilient-orders-platform-system
     path: infra/platform-system
   platformRuntime:
-    enabled: true
-    wave: "-10"
     applicationName: resilient-orders-platform-runtime
     project: resilient-orders-platform-runtime
-    releaseName: resilient-orders-platform-runtime
     path: infra/platform-runtime
   services:
-    enabled: false
-    wave: "0"
     applicationName: resilient-orders-services
     project: resilient-orders-services
-    releaseName: resilient-orders-services
     path: infra/services
-    imageUpdater:
-      enabled: false
-
-childValues:
-  platformSystem:
-    externalSecretsEnabled: true
-    kyvernoPolicyEnabled: false
-  platformRuntime:
-    postgresEnabled: true
-    redisEnabled: true
-    rabbitmqEnabled: false
-  services:
-    paymentServiceEnabled: false
-    orderServiceEnabled: false
-    notificationServiceEnabled: false
-    rabbitmqTopologyEnabled: false
