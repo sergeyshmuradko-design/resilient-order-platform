@@ -1,17 +1,7 @@
 # Desired component state. Workflow choices keep/enable/disable update these booleans.
-selection:
-  enable_postgres: false
-  enable_redis: false
-  enable_rabbitmq_stack: false
-  enable_strimzi: false
-  enable_kyverno: false
-  enable_payment_service: false
-  enable_order_service: false
-  enable_notification_service: false
-
+selection: {"enable_postgres": true, "enable_redis": true, "enable_rabbitmq_stack": false, "enable_strimzi": false, "enable_kyverno": false, "enable_payment_service": true, "enable_order_service": false, "enable_notification_service": false}
 repositoryUrl: ""
 targetRevision: main
-
 namespaces:
   argocd: argocd
   platform: resilient-orders-platform
@@ -22,9 +12,7 @@ namespaces:
   strimzi: strimzi-system
   kyverno: kyverno-system
   certManager: cert-manager
-
 containerImagePrefix: ghcr.io/sergeyshmuradko-design/resilient-order-platform
-
 operators:
   project: resilient-orders-platform-operators
   externalSecrets:
@@ -69,7 +57,6 @@ operators:
     repoURL: https://kyverno.github.io/kyverno
     chart: kyverno
     targetRevision: 3.5.2
-
 secrets:
   external:
     storeName: infisical-cluster-store
@@ -80,12 +67,10 @@ secrets:
       secretsPath: /
       authSecretName: infisical-universal-auth
       authSecretNamespace: argocd
-
 sync:
   automated:
     prune: true
     selfHeal: true
-
 layers:
   platformSystem:
     applicationName: resilient-orders-platform-system
